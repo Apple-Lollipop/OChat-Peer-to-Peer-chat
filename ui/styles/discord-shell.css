@@ -59,7 +59,6 @@
 #navigation-dialog .sidebar-action,#navigation-dialog #new-room {width:100%;min-height:29px;padding:7px 9px;font-size:10px;margin:0;text-align:left;border:0;border-radius:4px;background:transparent;box-shadow:none;}
 #navigation-dialog .sidebar-action:hover {background:var(--hover);}
 #navigation-dialog .sidebar-bottom {flex-shrink:0;margin:0;padding:4px 8px;border-top:1px solid var(--line);}
-#navigation-dialog .sidebar-bottom button {font-size:10px;min-height:25px;}
 .channel-shortcut {display:flex;align-items:center;gap:9px;min-height:31px;width:100%;padding:6px 9px;font-size:12px;color:var(--muted);border-radius:4px;text-align:left;border:0;background:transparent;}
 .channel-shortcut.selected,.channel-shortcut:hover {background:var(--hover);color:var(--text);}
 .channel-hash {font-size:21px;color:var(--muted);}
@@ -70,12 +69,3 @@
 #sidebar-channel-tools .voice-avatar {height:21px;width:21px;min-width:21px;font-size:7px;}
 #sidebar-channel-tools #room-voice-elapsed {font-size:9px;padding:0 9px;margin:4px 0;}
 .sidebar-footer {margin-top:auto;flex-shrink:0;background:var(--account);}
-.account-controls {display:flex;align-items:center;gap:2px;min-height:53px;padding:7px 6px;border-top:1px solid var(--line);}
-.account-controls .profile {display:flex;align-items:center;flex:1;gap:7px;min-width:0;padding:0;margin:0;border:0;}
-.account-controls .profile>.avatar {width:30px;height:30px;min-width:30px;font-size:10px;}
-.account-controls .profile>div {display:block;min-width:0;flex:1;}
-.account-controls .profile strong {font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;max-width:98px;white-space:nowrap;}
-.account-controls .profile small {display:block;font-size:9px;color:var(--muted);}
-.account-controls #lock-button,.account-controls #settings-button {width:26px;height:30px;min-width:26px;padding:4px;background:transparent;border:0;border-radius:4px;color:var(--muted);font-size:0;}
-.account-controls svg {width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;}
-.account-controls button:hover {background:var(--hover);color:var(--text);}

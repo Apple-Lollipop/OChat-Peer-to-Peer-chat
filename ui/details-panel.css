@@ -1,0 +1,64 @@
+/* Conversation details: group header, member rows and the shared library card. */
+.discord-shell #details-dialog{--details-gutter:12px;padding-top:0;padding-inline:var(--details-gutter)}
+@media(max-width:899px){.discord-shell #details-dialog{--details-gutter:16px}}
+.discord-shell #details-dialog>.panel-heading{min-height:52px;margin:0 calc(-1*var(--details-gutter)) 18px;padding:0 10px 0 var(--details-gutter);border-bottom:1px solid var(--line);box-sizing:border-box}
+.discord-shell #details-dialog>.panel-heading h2{font-size:15px;font-weight:700}
+
+/* Group header */
+.discord-shell #details-dialog #room-illustration-section{display:flex;flex-direction:column;align-items:center;margin:0 0 20px;padding:0;border:0;text-align:center}
+.discord-shell #details-dialog #room-illustration-section[hidden]{display:none}
+.discord-shell #details-dialog #room-illustration{width:72px;height:72px;min-width:72px;border-radius:18px;font-size:24px;font-weight:700}
+.discord-shell #details-dialog #illustration-name{margin:14px 0 0;font-size:17px;font-weight:700;line-height:22px;overflow-wrap:anywhere}
+#details-room-summary{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:18px}
+.details-encryption{display:inline-flex;align-items:center;gap:6px;margin:12px 0 0;padding:4px 10px;border-radius:12px;background:color-mix(in srgb,var(--accent-base,var(--accent)) 20%,transparent);color:var(--accent);font-size:12px;font-weight:700;line-height:16px}
+.details-encryption svg{flex:none;width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.discord-shell #details-dialog #room-illustration-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 12px;margin-top:8px}
+.discord-shell #details-dialog #room-illustration-actions[hidden],#remove-room-illustration[hidden]{display:none}
+.discord-shell #details-dialog #room-illustration-actions button{min-height:24px;padding:2px 4px;color:var(--muted);font-size:12px}
+.discord-shell #details-dialog #room-illustration-actions button:hover:not(:disabled){color:var(--text)}
+
+/* Member rows */
+.discord-shell #details-dialog .details-heading{display:block;margin:0 8px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:14px;text-transform:uppercase}
+.discord-shell #details-dialog #member-total{all:unset}
+.discord-shell #details-dialog .members{margin:0}
+.discord-shell #details-dialog #members .member{--presence-cutout:var(--panel);display:block;min-height:0;padding:0;border-radius:8px}
+.discord-shell #details-dialog #members .member:hover,.discord-shell #details-dialog #members .profile-selected{--presence-cutout:var(--hover)}
+.discord-shell #details-dialog #members .member-profile{display:flex;align-items:center;gap:8px;width:100%;min-height:55px;padding:6px 2px 6px 8px;border-radius:8px;background:transparent;font-size:14px;text-align:left}
+.discord-shell #details-dialog #members .avatar{width:34px;height:34px;min-width:34px;font-size:12px;font-weight:700}
+.discord-shell #details-dialog #members .member-info{flex:1;min-width:0}
+.discord-shell #details-dialog #members .member-name{display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;font-size:14px;font-weight:700;line-height:18px}
+.member-you{color:var(--muted);font-size:13px;font-weight:400}
+.member-you:empty{display:none}
+.member-details{display:flex;flex-wrap:wrap;align-items:center;gap:2px 5px;margin-top:2px;min-width:0}
+.discord-shell #details-dialog #members .member-meta{margin:0;color:var(--muted);font-size:12px;line-height:18px;overflow-wrap:anywhere}
+.discord-shell #details-dialog #members .member-role{padding:0 5px;border:0;border-radius:4px;background:color-mix(in srgb,var(--accent-base,var(--accent)) 26%,transparent);color:var(--accent);font-size:11px;font-weight:700;line-height:16px}
+.discord-shell #details-dialog #members .member-role[style*="--role-color"]{background:color-mix(in srgb,var(--role-color) 20%,transparent);color:color-mix(in srgb,var(--role-color) 60%,var(--text))}
+.discord-shell #details-dialog #members .member-role::before{display:none}
+.discord-shell #details-dialog #members [data-voice-speaking=false] .speech-slot{display:none}
+.discord-shell #details-dialog #members [data-voice-speaking=true] .speaking-dot{width:14px!important;min-width:14px;height:14px!important;flex:0 0 14px;background:transparent!important}
+.discord-shell #details-dialog #members [data-voice-speaking] .speaking-dot svg{width:13px;height:13px}
+
+/* Signal: bar count and color both carry the quality. */
+.member-signal{display:inline-flex;flex:none;align-items:center;gap:4px;margin-left:-4px;color:var(--muted);font-size:11px}
+.member-signal[hidden]{display:none}
+.discord-shell #members .member-signal .voice-peer-ping{margin:0;font-size:11px}
+.signal-bars{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.signal-bars i{display:block;width:3px;border-radius:1px;background:color-mix(in srgb,var(--muted) 40%,transparent)}
+.signal-bars i:nth-child(1){height:5px}
+.signal-bars i:nth-child(2){height:8px}
+.signal-bars i:nth-child(3){height:11px}
+[data-quality=good] .signal-bars i{background:var(--success,#23a55a)}
+[data-quality=fair] .signal-bars i:nth-child(-n+2){background:#f0b232}
+[data-quality=poor] .signal-bars i:first-child{background:#f23f43}
+
+/* Shared library card */
+.discord-shell #details-dialog #shared-emojis-button{display:flex;align-items:center;gap:10px;width:100%;min-height:62px;margin:16px 0 0;padding:12px 8px 12px 12px;border:0;border-radius:12px;background:var(--account);box-shadow:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.discord-shell #details-dialog #shared-emojis-button:hover:not(:disabled){background:color-mix(in srgb,var(--account) 92%,var(--text))}
+.discord-shell #details-dialog #shared-emojis-button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.details-card-icon{display:grid;flex:none;place-items:center;width:36px;height:36px;border-radius:8px;background:var(--hover);color:#f0b232}
+.details-card-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.details-card-text{flex:1;min-width:0}
+.details-card-text strong{display:block;font-size:14px;font-weight:700;line-height:18px}
+.details-card-text small{display:block;color:var(--muted);font-size:12px;line-height:17px}
+.details-card-chevron{flex:none;width:14px;height:14px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media(forced-colors:active){.signal-bars i{forced-color-adjust:none}.details-encryption,.discord-shell #details-dialog #members .member-role{border:1px solid CanvasText}}

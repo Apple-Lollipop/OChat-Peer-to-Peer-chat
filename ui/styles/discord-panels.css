@@ -94,7 +94,6 @@
 .discord-shell .header-actions .secondary{font-size:10px;padding:6px;min-width:30px;}
 .discord-shell #voice-button{max-width:78px;white-space:normal;}
 .discord-shell #details-toggle{max-width:54px;}
-.discord-shell .account-controls .profile>div{display:block;}
 .discord-shell #settings-button{display:grid;}
 }
 @media(pointer:coarse) {
@@ -108,10 +107,6 @@
 .discord-shell .conversation-heading{flex-direction:row;justify-content:flex-start;align-items:baseline;text-align:left;}
 .discord-shell .rail-home,.discord-shell .rail-action{border-radius:50%;}
 .discord-shell .rail-home:hover,.discord-shell .rail-home[aria-pressed=true],.discord-shell .rail-action:hover{border-radius:15px;}
-.discord-shell #details-dialog .room-information{border-top:1px solid var(--line);margin-top:18px;padding-top:14px;font-size:11px;}
-.discord-shell #details-dialog .room-information>summary{cursor:pointer;color:var(--muted);font-weight:600;}
-.discord-shell #details-dialog .room-information[open]>summary{margin-bottom:15px;}
-.discord-shell #details-dialog .room-information .detail-section{margin-top:14px;}
 .discord-shell #navigation-toggle::before,.discord-shell #navigation-toggle::after,.discord-shell #settings-button::before{display:none;content:none;}/* Compact toolbar icons retain the original labels for assistive technology. */
 .discord-shell #voice-button,.discord-shell #search-button,.discord-shell #details-toggle{font-size:0;width:32px;min-width:32px;height:32px;padding:6px;}
 .discord-shell #voice-button::before,.discord-shell #search-button::before,.discord-shell #details-toggle::before{content:'';display:block;height:20px;width:20px;margin:auto;background:currentColor;mask-size:contain;mask-repeat:no-repeat;mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;}

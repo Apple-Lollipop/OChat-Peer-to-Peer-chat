@@ -1,57 +1,48 @@
-/* Persistent voice controls; participants remain under their voice channel. */
-.discord-shell #voice-bar {
-  display:flex;flex-direction:column;gap:6px;flex-shrink:0;position:relative;width:auto;
-  margin:0;padding:12px 10px;border:0;border-top:1px solid var(--line);border-radius:0;
-  background:var(--custom-panel,var(--panel));color:var(--custom-panel-text,var(--text));
-  box-shadow:none;backdrop-filter:none;max-height:none;overflow:visible;
-}
+/* Persistent voice card; participants remain under their voice channel. */
+.discord-shell #voice-bar{display:flex;flex-direction:column;align-items:stretch;flex-shrink:0;gap:10px;position:relative;width:auto;margin:0 8px 8px;padding:8px;border:1px solid color-mix(in srgb,var(--success,#23a55a) 40%,transparent);border-radius:12px;background:color-mix(in srgb,var(--success,#23a55a) 7%,var(--account));color:var(--text);box-shadow:none;backdrop-filter:none;max-height:none;overflow:visible}
 .discord-shell #voice-bar[hidden]{display:none}
-.discord-shell #voice-bar .dock-heading{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
-.discord-shell #voice-bar .studio-audio-mark{width:15px;min-width:15px;height:15px;color:var(--success)}
-.discord-shell #voice-bar .studio-audio-mark svg{width:15px;height:15px}
-.discord-shell #voice-label{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;color:var(--success)}
-.discord-shell #voice-elapsed{font-size:10px;font-variant-numeric:tabular-nums;margin-left:auto}
-.discord-shell #stop-voice{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:5px;font-size:11px;border:0;border-radius:8px;background:transparent;color:var(--danger);margin:0}
-.discord-shell #voice-hint,.discord-shell #voice-roster{display:none}
-.discord-shell #voice-bar .dock-tools,.discord-shell #voice-bar .visual-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0}
-.discord-shell #voice-bar :is(.dock-tools,.visual-controls)>button{
-  display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:36px;margin:0;padding:7px 6px;
-  font-size:11px;line-height:1.3;white-space:normal;border:1px solid var(--line);border-radius:10px;
-  background:var(--field);color:var(--text);
-}
-.discord-shell #voice-bar :is(.dock-tools,.visual-controls)>button:hover{background:var(--hover)}
-.discord-shell #voice-bar :is(#mute-button,#deafen-button)[aria-pressed=true]{color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,var(--field));border-color:color-mix(in srgb,var(--danger) 30%,var(--line))}
-.discord-shell #voice-bar :is(#camera-button,#screen-button,#talk-button)[aria-pressed=true]{color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--field))}
-.discord-shell #voice-bar #talk-button{grid-column:1/-1}
-@media(max-width:899px){
- .discord-shell #voice-bar{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin:0 12px 8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
- .discord-shell #voice-bar .dock-heading{grid-column:1/-1;grid-row:auto}
- .discord-shell #voice-bar .dock-tools,.discord-shell #voice-bar .visual-controls{display:contents}
- .discord-shell #voice-bar :is(#voice-diagnostics-button,#dock-audio-settings,#mute-button,#deafen-button){grid-column:span 2;grid-row:auto}
- .discord-shell #voice-bar :is(#camera-button,#screen-button){grid-column:span 4;grid-row:auto}
- .discord-shell #voice-bar #talk-button{grid-column:1/-1;grid-row:auto}
-}
-@media(max-width:520px){.discord-shell #voice-bar{margin:0 10px 6px;padding:8px}.discord-shell #voice-bar :is(.dock-tools,.visual-controls)>button{gap:4px;padding:6px 4px;font-size:10px}.discord-shell #voice-bar button::before{width:16px;height:16px;flex-basis:16px}}
+.discord-shell #voice-bar .dock-heading{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;margin:0;padding:4px 0 0 4px}
+.discord-shell #voice-bar .dock-signal{display:grid;place-items:center;width:auto;min-width:0;height:auto;min-height:0;margin:0;padding:2px;border:0;border-radius:4px;background:transparent;box-shadow:none;font-size:0;cursor:pointer}
+.discord-shell #voice-bar .dock-signal::before{display:none}
+.discord-shell #voice-bar .dock-signal:hover{background:var(--hover)}
+.dock-status{min-width:0}
+.dock-status-line{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.discord-shell #voice-bar #voice-state{flex:1;min-width:0;overflow:visible;white-space:normal;color:var(--success,#23a55a);font-size:14px;font-weight:700;line-height:18px}
+.discord-shell #voice-elapsed{flex:none;margin:0 0 0 auto;color:var(--muted);font-family:inherit;font-size:13px;font-variant-numeric:tabular-nums;line-height:18px}
+.discord-shell #voice-label{display:block;margin:0;color:var(--muted);font-size:13px;font-weight:400;line-height:18px;overflow-wrap:anywhere}
+.discord-shell #stop-voice{--control-icon:url("../icons/hangup.svg");display:grid;place-items:center;width:36px;min-width:36px;height:36px;min-height:0;margin:0;padding:0;border:0;border-radius:8px;background:#da373c;box-shadow:none;color:#fff;font-size:0}
+.discord-shell #stop-voice[hidden]{display:none}
+.discord-shell #stop-voice:hover:not(:disabled){background:#c42f34;color:#fff}
+.discord-shell #voice-hint,.discord-shell #voice-roster,.discord-shell #dock-audio-settings{display:none}
+.discord-shell #voice-bar .dock-tools{display:contents}
+.discord-shell #voice-bar .visual-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0;padding:0}
+.dock-split{display:flex;gap:1px;min-width:0}
+.discord-shell #voice-bar .visual-controls button,.discord-shell #voice-bar #talk-button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;height:36px;min-height:0;margin:0;padding:0;border:0;border-radius:8px;background:var(--panel);box-shadow:none;color:var(--text);font-size:0}
+.discord-shell #voice-bar .visual-controls button:hover:not(:disabled),.discord-shell #voice-bar #talk-button:hover:not(:disabled){background:var(--hover)}
+.discord-shell #voice-bar .dock-split>button:first-child{flex:1;border-radius:8px 0 0 8px}
+.discord-shell #voice-bar .dock-split>.quick-device-menu{flex:none;width:14px;min-width:14px!important;padding:0!important;border-radius:0 8px 8px 0;color:var(--muted);font-size:8px}
+.discord-shell #voice-bar :is(#mute-button,#deafen-button)[aria-pressed=true]{color:var(--danger);background:color-mix(in srgb,var(--danger) 16%,var(--panel))}
+.discord-shell #voice-bar :is(#camera-button,#screen-button,#talk-button)[aria-pressed=true]{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel))}
+.discord-shell #voice-bar #talk-button{width:100%;font-size:12px}
+.discord-shell #voice-bar .dock-technical{padding:0 4px}
+.discord-shell .channel-select.voice-connected,.discord-shell .channel-select.voice-connected:hover{background:transparent;color:var(--success,#23a55a)}
+.discord-shell .channel-select.voice-connected .channel-name{color:inherit;font-weight:700}
+.discord-shell .channel-select.voice-connected .channel-clock{color:var(--muted)}
+@media(max-width:899px){.discord-shell #voice-bar{margin:0 12px 8px}}
+@media(max-width:520px){.discord-shell #voice-bar{margin:0 10px 6px}}
 
-/* Private calls keep both identities visible, including in the compact dock. */
-.discord-shell #voice-bar.private-call #voice-roster {
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
-  grid-column:1/-1;order:-1;margin:0 0 4px;padding:0;overflow:visible;
-}
-.discord-shell #voice-bar.private-call .voice-person {
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  position:relative;gap:7px;min-width:0;width:100%;padding:14px 8px;
-  border:1px solid var(--line);border-radius:16px;background:var(--field);
-  color:var(--text);text-align:center;white-space:normal;height:auto;
-}
-.discord-shell #voice-bar.private-call .voice-person:hover{background:var(--hover)}
-.discord-shell #voice-bar.private-call .voice-avatar{width:48px;height:48px;min-width:48px;flex:none;font-size:17px}
-.discord-shell #voice-bar.private-call .voice-person-name{max-width:100%;white-space:normal;overflow-wrap:anywhere;font-size:12px;font-weight:600}
-.discord-shell #voice-bar.private-call .call-person-connection{font-size:10px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+/* Private calls show the other person as a compact row; your own identity is the account block. */
+.discord-shell #voice-bar.private-call :is(.visual-controls,#talk-button,.dock-technical){order:1}
+.discord-shell #voice-bar.private-call #voice-roster{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;overflow:visible}
+.discord-shell #voice-bar.private-call #voice-roster:not(:has(.voice-person:not(.is-self))){display:none}
+.discord-shell #voice-bar.private-call:has(#voice-roster .voice-person:not(.is-self)) #voice-label{display:none}
+.discord-shell #voice-bar.private-call .voice-person.is-self{display:none}
+.discord-shell #voice-bar.private-call .voice-person{--presence-cutout:var(--panel);display:grid;grid-template-columns:32px minmax(0,1fr) auto auto;align-items:center;column-gap:8px;width:100%;height:auto;min-width:0;margin:0;padding:6px 8px;border:0;border-radius:8px;background:var(--panel);box-shadow:none;color:var(--text);text-align:left;white-space:normal}
+.discord-shell #voice-bar.private-call .voice-person:hover{--presence-cutout:var(--hover);background:var(--hover)}
+.discord-shell #voice-bar.private-call .voice-avatar{grid-column:1;grid-row:1/3;width:32px;height:32px;min-width:32px;font-size:11px;font-weight:700}
+.discord-shell #voice-bar.private-call .voice-person-name{grid-column:2;grid-row:1;min-width:0;max-width:100%;overflow:hidden;font-size:13px;font-weight:700;line-height:17px;text-overflow:ellipsis;white-space:nowrap}
+.discord-shell #voice-bar.private-call .call-person-connection{grid-column:2;grid-row:2;min-width:0;color:var(--muted);font-size:11px;line-height:15px;overflow-wrap:anywhere}
+.discord-shell #voice-bar.private-call .speech-slot{grid-column:3;grid-row:1/3;position:static}
+.discord-shell #voice-bar.private-call .voice-state-badges{grid-column:4;grid-row:1/3;margin:0;padding:0}
+.discord-shell #voice-bar.private-call [data-voice-speaking=false] .speech-slot,.discord-shell #voice-bar.private-call .voice-person[data-voice-speaking=false] .speech-slot{display:none}
 .discord-shell #voice-bar.private-call .voice-peer-ping{display:none}
-.discord-shell #voice-bar.private-call .speech-slot{position:absolute;top:8px;right:8px}
-@media(max-width:899px){
- .discord-shell #voice-bar.private-call .voice-person{display:grid;grid-template-columns:36px minmax(0,1fr);text-align:left;padding:8px;gap:3px 8px}
- .discord-shell #voice-bar.private-call .voice-avatar{grid-row:1/3;width:36px;height:36px;min-width:36px}
- .discord-shell #voice-bar.private-call .call-person-connection{grid-column:2}
-}

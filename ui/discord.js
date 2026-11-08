@@ -184,7 +184,7 @@
         if(kind==='text')row.icon.textContent='#';else if(!row.icon.firstChild)row.icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 4 6 8H3v8h3l5 4V4Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';
         row.main.setAttribute('aria-label',kind==='text'?'Open text channel '+channel.name:(next.voice_channel===channel.id?'Open':'Join')+' voice channel '+channel.name);
         row.main.setAttribute('aria-pressed',String(kind==='text'?next.text_channel===channel.id:next.voice && next.voice_channel===channel.id));
-        row.main.classList.toggle('selected',kind==='text'?next.text_channel===channel.id:next.voice && next.voice_channel===channel.id);
+        row.main.classList.toggle('selected',kind==='text'?next.text_channel===channel.id:next.voice && next.voice_channel===channel.id);row.main.classList.toggle('voice-connected',kind==='voice' && !!next.voice && next.voice_channel===channel.id);
         row.badge.textContent=unread.get(channel.id)||'';
         row.main.onclick=async()=>{
           if(row.main.disabled)return;const context=api.context();row.main.disabled=true;

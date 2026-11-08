@@ -18,7 +18,7 @@
     const context=scope(room).room;
     const label=context&&context.capacity!==2&&Object.prototype.hasOwnProperty.call(roles,person?.role)?(scope(room).snapshot?.role_names?.[person.role]||roles[person.role]):null;
     if(!label){badge?.remove();return;}
-    if(!badge){badge=document.createElement('span');badge.className='member-role';parent.append(badge);}
+    if(!badge){badge=document.createElement('span');badge.className='member-role';parent.prepend(badge);}
     badge.title=roles[person.role];badge.textContent=label;badge.dataset.role=person.role;badge.setAttribute('aria-label','Room role: '+label);
     const candidate=scope(room).snapshot?.role_colors?.[person.role];
     const color=/^#[0-9a-f]{6}$/i.test(candidate||'')?candidate:null;
@@ -52,9 +52,30 @@
     if(dot&&!dot.firstElementChild){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M11 5 6 9H3v6h3l5 4V5Zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14');svg.append(path);dot.append(svg);}
     if(dot){dot.hidden=!speaking;dot.setAttribute('aria-hidden',String(!speaking));dot.classList.toggle('speaking',speaking);dot.setAttribute('aria-label',speaking?'Speaking':'Silent');}
     let ping=row.querySelector(':scope > .voice-peer-ping');
-    const measured=person?.id!==state?.id&&person?.online!==false&&person?.voice===true&&Number.isFinite(person?.latency_ms)&&person.latency_ms>0;
+    const measured=!row.classList.contains('member')&&person?.id!==state?.id&&person?.online!==false&&person?.voice===true&&Number.isFinite(person?.latency_ms)&&person.latency_ms>0;
     if(measured&&!ping){ping=document.createElement('span');ping.className='voice-peer-ping';row.append(ping);}
     if(ping){ping.hidden=!measured;if(measured){const value=Math.round(person.latency_ms);ping.textContent=value+' ms';ping.title='Connection round-trip time: '+value+' milliseconds';ping.setAttribute('aria-label',ping.title);}}
+  }
+  function signalQuality(ms){return ms<=300?'good':ms<=500?'fair':'poor';}
+  function memberSignal(row,person){
+    const profile=row.querySelector('.member-profile');
+    let signal=profile.querySelector(':scope > .member-signal');
+    const self=person?.id===state?.id,connected=!!person&&person.online!==false&&!row.classList.contains('offline');
+    const measured=connected&&!self&&Number.isFinite(person.latency_ms)&&person.latency_ms>0;
+    const visible=connected&&(self||measured);
+    if(visible&&!signal){
+      signal=document.createElement('span');signal.className='member-signal';signal.setAttribute('role','img');
+      const bars=document.createElement('span');bars.className='signal-bars';bars.setAttribute('aria-hidden','true');bars.append(...[1,2,3].map(()=>document.createElement('i')));
+      const ping=document.createElement('span');ping.className='voice-peer-ping';signal.append(bars,ping);profile.append(signal);
+    }
+    if(!signal){profile.removeAttribute('aria-description');return;}
+    const ping=signal.querySelector('.voice-peer-ping');
+    signal.hidden=ping.hidden=!visible;
+    if(!visible){profile.removeAttribute('aria-description');return;}
+    const value=measured?Math.round(person.latency_ms):null,quality=measured?signalQuality(value):'good';
+    const label=measured?`${({good:'Good',fair:'Fair',poor:'Poor'})[quality]} connection, ${value} milliseconds round-trip`:'This device is connected';
+    signal.dataset.quality=quality;signal.title=label;signal.setAttribute('aria-label',label);profile.setAttribute('aria-description',label);
+    ping.hidden=!measured;ping.textContent=measured?value+' ms':'';
   }
   function syncMembers(){
     for(const row of document.querySelectorAll('.member,.voice-person,.channel-person,.voice-channel-person')){
@@ -62,7 +83,7 @@
       const room=row.closest('#voice-roster')?activeVoice()?.room?.id:selectedRoom;
       const person=id&&room?member(id,room):null;
       paintAvatar(row.querySelector('.avatar'),person,room);
-      if(row.classList.contains('member')){roleBadge(row.querySelector('.member-name'),person,room);voiceActivity(row,person);}
+      if(row.classList.contains('member')){roleBadge(row.querySelector('.member-details'),person,room);voiceActivity(row,person);memberSignal(row,person);}
       else {audioBadge(row,person);voiceActivity(row,person);}
     }
     const card=document.getElementById('peer-card'),avatar=document.getElementById('peer-avatar');
@@ -89,6 +110,6 @@
     syncMembers();
     for(const message of document.querySelectorAll('.message[data-peer][data-room]'))paintAvatar(message.querySelector('.avatar'),member(message.dataset.peer,message.dataset.room),message.dataset.room);
   }
-  function reset(){for(const avatar of document.querySelectorAll('.role-avatar'))paintAvatar(avatar,null,null);for(const node of document.querySelectorAll('[data-avatar-peer]')){node.querySelector('.presence-dot')?.remove();node.classList.remove('status-avatar');delete node.dataset.avatarHash;delete node.dataset.avatarName;delete node.dataset.avatarPeer;}document.getElementById('peer-presence')?.removeAttribute('data-status');for(const badge of document.querySelectorAll('.member-role,.voice-state-badges,.voice-peer-ping'))badge.remove();document.getElementById('peer-room-role')?.remove();for(const row of document.querySelectorAll('[data-voice-muted]')){delete row.dataset.voiceMuted;delete row.dataset.voiceDeafened;delete row.dataset.voiceSpeaking;row.removeAttribute('aria-description');}}
+  function reset(){for(const avatar of document.querySelectorAll('.role-avatar'))paintAvatar(avatar,null,null);for(const node of document.querySelectorAll('[data-avatar-peer]')){node.querySelector('.presence-dot')?.remove();node.classList.remove('status-avatar');delete node.dataset.avatarHash;delete node.dataset.avatarName;delete node.dataset.avatarPeer;}document.getElementById('peer-presence')?.removeAttribute('data-status');for(const badge of document.querySelectorAll('.member-role,.voice-state-badges,.voice-peer-ping,.member-signal'))badge.remove();document.getElementById('peer-room-role')?.remove();for(const row of document.querySelectorAll('[data-voice-muted]')){delete row.dataset.voiceMuted;delete row.dataset.voiceDeafened;delete row.dataset.voiceSpeaking;row.removeAttribute('aria-description');}}
   window.OchatPresence={sync,reset,decorateMessage:row=>paintAvatar(row.querySelector('.avatar'),member(row.dataset.peer,row.dataset.room),row.dataset.room)};
 })();

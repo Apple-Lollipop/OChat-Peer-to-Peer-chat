@@ -142,7 +142,7 @@ function renderIdentity(room) {
   window.OchatCommunity?.badge($('conversation-identity'),context.direct?person:null);
   const group=!!room && !context.direct;
   $('room-illustration-section').hidden=!group;
-  if(group){profileAvatar($('room-illustration'),room.name,context.room?.image_hash);$('illustration-name').textContent=room.name;const owner=context.room?.owner===state.id;$('room-illustration-actions').hidden=!owner;$('illustration-hint').textContent=owner?'Shared with everyone. Choose a static PNG, JPEG or WebP image.':'The room owner manages this shared image.';$('choose-room-illustration').disabled=!context.snapshot || !!$('choose-room-illustration').dataset.busy;$('remove-room-illustration').hidden=!context.room?.image_hash;$('remove-room-illustration').disabled=!context.snapshot || !!$('remove-room-illustration').dataset.busy;}
+  if(group){profileAvatar($('room-illustration'),room.name,context.room?.image_hash);$('illustration-name').textContent=room.name;const owner=context.room?.owner===state.id;$('room-illustration-actions').hidden=!owner;$('choose-room-illustration').disabled=!context.snapshot || !!$('choose-room-illustration').dataset.busy;$('remove-room-illustration').hidden=!context.room?.image_hash;$('remove-room-illustration').disabled=!context.snapshot || !!$('remove-room-illustration').dataset.busy;}
   $('conversation-avatar').classList.toggle('group-avatar',!!room && !context.direct);
   $('conversation-identity').disabled=!room;
   $('conversation-identity').setAttribute('aria-label',person?`View ${person.name}'s profile`:'View conversation details');
@@ -173,7 +173,7 @@ function renderPeerCard() {
   if(inspectedRoom!==selectedRoom){window.OchatProfiles?.close(false);inspectedPeer=null;inspectedRoom=selectedRoom;}
   const context=conversationContext(selectedRoom),target=inspectedPeer || context.peer;
   const person=target ? peerDetails(target.id,target.room || selectedRoom,target.name) : null;
-  $('details-title').textContent=person&&!inspectedPeer?'Profile':context.direct?'Private chat':'Group details';
+  $('details-title').textContent=person&&!inspectedPeer?'Profile':context.direct?'Private chat':'Details';
   $('participants-section').hidden=!!context.direct && !!context.peer;
   $('peer-card').hidden=!person;
   if(!person){clearPeerCard();return;}
@@ -346,9 +346,15 @@ function syncKeyed(container,items,key,create,update) {
 function emptyList(container,text) {if(!container.children.length)container.append(el('p','empty-small',text));}
 function speechSlot() {const slot=el('span','speech-slot'),dot=speakingIcon();slot.append(dot);return {slot,dot};}
 function setSpeaking(dot,active) {dot.hidden=!active;dot.setAttribute('aria-hidden',String(!active));}
+function memberActivity(peer) {
+  if(peer.online===false)return 'Offline';
+  if(peer.voice){const channel=state.channels?.find(c=>c.id===peer.voice_channel);return channel?`In ${channel.name}`:'In voice';}
+  if(peer.availability==='invisible')return peer.self?'Invisible':'Offline';
+  return ({away:'Away',busy:'Do not disturb'})[peer.availability]||'Online';
+}
 function createMember() {
   const row=el('div','member');row._avatar=el('span','avatar');row._presence=el('span','presence-dot');row._presence.setAttribute('role','img');
-  row._info=el('div','member-info');row._name=el('strong','member-name');row._nameText=el('span','');const speech=speechSlot();row._speech=speech.dot;row._name.append(row._nameText,speech.slot);row._meta=el('small','member-meta');row._info.append(row._name,row._meta);
+  row._info=el('div','member-info');row._name=el('strong','member-name');row._nameText=el('span','');const speech=speechSlot();row._speech=speech.dot;row._name.append(row._nameText,speech.slot);row._you=el('span','member-you');row._nameText.after(row._you);row._meta=el('small','member-meta');row._details=el('div','member-details');row._details.append(row._meta);row._info.append(row._name,row._details);
   row._profile=el('button','member-profile');row._profile.type='button';row._profile.append(row._avatar,row._info);
   row._friend=el('button','text-button friend-action');row._friend.type='button';row.append(row._profile,row._friend);return row;
 }
@@ -356,9 +362,9 @@ function updateMember(row,peer) {
   const online=peer.online!==false;row.classList.toggle('offline',!online);row._nameText.textContent=peer.name;
   profileAvatar(row._avatar,peer.name,peer.avatar_hash,peer.id);if(row._presence.parentNode!==row._avatar)row._avatar.append(row._presence);
   row._presence.className=`presence-dot ${online?'online':'offline'}`;row._presence.setAttribute('aria-label',online?'Online':'Offline');
-  row._meta.textContent=!online?'Offline':peer.voice?'In voice':'Online';
+  row._you.textContent=peer.self?'you':'';row._meta.textContent=memberActivity(peer);
   setSpeaking(row._speech,online && peer.voice && peer.speaking);window.OchatCommunity?.badge(row._name,peer);
-  row._profile.setAttribute('aria-label',`View ${peer.name}'s profile`);row._profile.onclick=()=>showPeer(peer.id,peer.name,selectedRoom,row._profile);
+  row._profile.setAttribute('aria-label',peer.self?'View your profile':`View ${peer.name}'s profile`);row._profile.onclick=()=>showPeer(peer.id,peer.name,selectedRoom,row._profile);
   const friend=friends.find(f=>f.peer===peer.id),button=row._friend;button.hidden=peer.id===state.id;button.textContent=friend?.status==='accepted'?'Message':friend?.status==='incoming'?'Accept':friend?.status==='outgoing'?'Pending':'Add friend';button.disabled=friend?.status==='outgoing';button.setAttribute('aria-label',`${button.textContent} ${peer.name}`);
   button.onclick=()=>action(button,async()=>{if(friend?.status==='accepted')await messageFriend(friend);else if(friend?.status==='incoming'){await invoke('respond_friend',{peer:peer.id,accept:true});await refreshFriends();}else{const sent=await invoke('add_friend',{peer:peer.id});await refreshFriends();toast(sent?'Friend request sent.':'Request saved. It will retry when the peer is reachable.');}});
 }
@@ -368,12 +374,13 @@ function syncVoiceList(container,peers,room=selectedRoom) {
     let connection=row.querySelector('.call-person-connection');
     if(privateCall){
       if(!connection){connection=el('small','call-person-connection');row.append(connection);}
+      row.classList.toggle('is-self',peer.id===state?.id);
       const self=peer.id===state?.id,online=peer.online!==false;
       const route=self?'This device':!online?'Reconnecting…':peer.route==='direct'?'Direct':peer.route==='relay'?(settings?.tor_enabled?'Tor → relay':'Relayed'):'Route unavailable';
       const ping=!self&&online&&Number.isFinite(peer.latency_ms)&&peer.latency_ms>0?Math.round(peer.latency_ms)+' ms':'Ping unavailable';
       connection.textContent=self?route:route+' · '+ping;
       connection.title=self?'Your local microphone and audio output':'Current round-trip time and encrypted connection from this device';
-    }else connection?.remove();
+    }else{connection?.remove();row.classList.remove('is-self');}
   });
   if(!peers.length)emptyList(container,'Nobody in voice.');
 }
@@ -386,6 +393,7 @@ function renderDock() {
   const voice=activeVoice();$('voice-bar').hidden=!voice;$('voice-bar').classList.toggle('private-call',voice?.room?.capacity===2);const active=!!voice;
   $('stop-voice').hidden=!active;
   if(!voice){releaseTalk();$('voice-roster').replaceChildren();renderTalk();updateVoiceTimer();return;}
+  $('voice-state').textContent=voice.call&&voice.call.status!=='active'?'Connecting…':'Voice connected';
   $('voice-label').textContent=conversationContext(voice.room.id).title+(voice.voice_channel?' → '+(voice.channels?.find(c=>c.id===voice.voice_channel)?.name || 'Voice'):'');$('stop-voice').textContent=voice.call?'Hang up':'Leave';$('stop-voice').title=voice.call?'Hang up':'Leave voice';$('stop-voice').setAttribute('aria-label',$('stop-voice').title);
   $('mute-button').textContent=voice.muted?'Unmute':'Mute';$('voice-hint').textContent=voice.muted?'Microphone muted · listening only':settings?.audio.push_to_talk?(talkRoom?'Transmitting while held':'Push-to-talk · listening'):'Microphone active';
   $('mute-button').title=$('voice-hint').textContent;$('mute-button').setAttribute('aria-pressed',String(!!voice.muted));
@@ -419,7 +427,7 @@ function accentTokens(hex,dark,surfaceColors=null) {
 }
 function applyAccent(hex) {
   const theme=document.documentElement.dataset.theme,dark=theme==='dark' || (theme==='system' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches),root=document.documentElement,computed=getComputedStyle(root),surfaces=['--bg','--panel','--field','--sidebar'].map(name=>computed.getPropertyValue(name).trim()),tokens=accentTokens(hex,dark,surfaces.every(value=>/^#[0-9a-f]{6}$/i.test(value))?surfaces:null);
-  root.style.setProperty('--accent',tokens.accent);root.style.setProperty('--accent-hover',tokens.hover);root.style.setProperty('--accent-foreground',tokens.foreground);root.style.setProperty('--selection',tokens.selection);root.style.setProperty('--focus',tokens.accent+'33');
+  root.style.setProperty('--accent',tokens.accent);root.style.setProperty('--accent-base',/^#[\da-f]{6}$/i.test(hex)?hex:tokens.accent);root.style.setProperty('--accent-hover',tokens.hover);root.style.setProperty('--accent-foreground',tokens.foreground);root.style.setProperty('--selection',tokens.selection);root.style.setProperty('--focus',tokens.accent+'33');
 }
 const welcomeTemplate = $('welcome').cloneNode(true);
 const unicodeEmojis = '🫶 🥹 🫨 🫩 🫥 🫣 🤭 🥲 😮‍💨 😵‍💫 🙂‍↕️ 🙂‍↔️ 😶‍🌫️ 😌 😋 😛 😜 🤪 😝 🤑 🤐 🤢 🤮 🤧 🤒 🤕 🥶 🥵 🧐 🤓 🥸 😈 👿 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🙈 🙉 🙊 👶 🧒 👦 👧 🧑 👨 👩 🧔 👴 👵 👮 👷 🧑‍💻 🧑‍🎨 🧑‍🚀 🧑‍🍳 👑 🎩 🧢 🕶️ 🦁 🐯 🐨 🐷 🐮 🐵 🐔 🐧 🐦 🦉 🦋 🐝 🐢 🐍 🐬 🦈 🐙 🦄 🐲 🌹 🌸 🌷 🌺 🌴 🌵 🍀 🍁 🍂 🍄 🌍 🌎 🌏 🌕 🌞 🌝 ⚡ 🌧️ ❄️ 🌊 🍎 🍏 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥑 🍅 🥕 🌶️ 🥐 🍞 🧀 🍔 🍟 🌭 🌮 🥙 🍣 🍜 🍝 🍰 🎂 🍫 🍿 🍦 🥤 🍷 🍺 🧋 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🏸 🥊 🏆 🏅 🎮 🕹️ 🎲 🧩 🎸 🎹 🥁 🎤 🎬 🎨 🖌️ 🛫 🚀 🛸 🚗 🚕 🚌 🚲 🏍️ 🚆 ⛵ 🏖️ 🏔️ 🏠 🏡 🏙️ 💻 ⌨️ 🖱️ 📱 💡 📚 📖 📝 📌 📎 🔒 🔑 🛡️ 🧰 ⚙️ 🧪 🔬 🩺 💊 🧬 🩷 🩵 🩶 🤎 🧡 💖 💗 💓 💞 💕 💘 💝 💟 ☮️ ♻️ 🔔 🔕 📣 🚩 🏳️‍🌈 🏳️‍⚧️ 🫰 🫵 🤌 🤏 🤘 🤙 ✌️ 🖖 🖐️ ✋ 🤚 🫱 🫲 🫳 🫴 🫷 🫸 🦾 🦿 👣 💅 💃 🕺 🧘 🏃 🚶 🧍 🧎 👍🏻 👍🏼 👍🏽 👍🏾 👍🏿 🙏🏻 🙏🏼 🙏🏽 🙏🏾 🙏🏿 👋🏻 👋🏼 👋🏽 👋🏾 👋🏿 😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😘 😎 🤔 🤨 😐 😴 😭 😢 😤 😡 🤯 🥳 🤗 🤫 🫡 🫠 😇 🤖 👻 💀 🐱 🐶 🦊 🐼 🐸 🌻 🌈 ☀️ 🌙 ⭐ 🔥 ✨ ❤️ 💙 💜 💚 💛 🖤 🤍 💔 💯 ✅ ❌ 🎉 🎈 🎁 🎵 🎧 📷 🖼️ 🍕 ☕ 🍻 👍 👎 👏 🙌 👋 🤝 🙏 💪 👀 💬'.split(' ');
@@ -495,9 +503,9 @@ async function lockAccount() {
   previewEpoch++;previewCache.clear();previewObserver?.disconnect();
   endTabDrag();conversationLayout={order:[],pinned:[]};savedLayout={order:[],pinned:[]};layoutRevision++;layoutQueue=Promise.resolve();attentionRooms.clear();seenLiveMessages.clear();
   panelOpeners.clear();dialogReturnFocus.clear();introducedProfiles.clear();
-  inspectedPeer=null;inspectedRoom=null;clearPeerCard();$('room-illustration-section').hidden=true;$('illustration-name').textContent='';$('conversation-avatar').textContent='O';delete $('room-subtitle').dataset.presence;$('conversation-identity').disabled=true;$('conversation-kind').textContent='Your conversations';$('room-actions-name').textContent='';$('connection-summary').textContent='';
+  inspectedPeer=null;inspectedRoom=null;clearPeerCard();$('room-illustration-section').hidden=true;$('illustration-name').textContent='';$('details-room-summary').textContent='';$('details-encryption-label').textContent='';$('details-encryption').removeAttribute('title');$('conversation-avatar').textContent='O';delete $('room-subtitle').dataset.presence;$('conversation-identity').disabled=true;$('conversation-kind').textContent='Your conversations';$('room-actions-name').textContent='';$('connection-summary').textContent='';
   $('conversation-identity').setAttribute('aria-label','View conversation details');$('room-title').removeAttribute('title');$('message').setAttribute('aria-label','Message');$('message').placeholder='Write a draft…';$('send-button').title='Send message';$('voice-button').title='Join voice';delete $('peer-voice').dataset.speaking;
-  releaseTalk();$('settings-button').disabled=true;$('navigation-toggle').disabled=true;$('friends-button').disabled=true;friendRequestPending=false;$('send-friend-request').disabled=true;$('friends-own-id').textContent='';$('friends-own-id').removeAttribute('title');$('copy-contact-id').disabled=true;$('copy-contact-id').textContent='Copy';$('friends-button').textContent='Friends';$('room-voice-roster').replaceChildren();$('room-voice-elapsed').textContent='00:00';$('voice-label').textContent='Voice connected';$('voice-hint').textContent='';$('voice-elapsed').textContent='00:00';$('conversation-panel').removeAttribute('aria-labelledby');membersKey='';roomsKey='';friendsRenderKey='';lastTabSelection=null;$('private-conversation-tabs').replaceChildren();$('room-conversation-tabs').replaceChildren();$('private-tab-count').textContent='0';$('room-tab-count').textContent='0';$('details-toggle').disabled=true;$('room-actions-toggle').disabled=true;$('lock-button').disabled=true;friends=[];friendRetries.clear();friendGeneration++;$('friend-list').replaceChildren();$('talk-button').hidden=true;$('reconnect-panel').hidden=true;searchGeneration++;replyDrafts.clear();messageCache.clear();searchRoom=null;notificationRoom=null;$('search-results').replaceChildren();$('search-query').value='';$('search-status').textContent='';$('room-notifications-name').textContent='';renderReply();
+  releaseTalk();$('settings-button').disabled=true;$('navigation-toggle').disabled=true;$('friends-button').disabled=true;friendRequestPending=false;$('send-friend-request').disabled=true;$('friends-own-id').textContent='';$('friends-own-id').removeAttribute('title');$('copy-contact-id').disabled=true;$('copy-contact-id').textContent='Copy';$('friends-button').textContent='Friends';$('room-voice-roster').replaceChildren();$('room-voice-elapsed').textContent='00:00';$('voice-state').textContent='Voice connected';$('voice-label').textContent='';$('voice-hint').textContent='';$('voice-elapsed').textContent='00:00';$('conversation-panel').removeAttribute('aria-labelledby');membersKey='';roomsKey='';friendsRenderKey='';lastTabSelection=null;$('private-conversation-tabs').replaceChildren();$('room-conversation-tabs').replaceChildren();$('private-tab-count').textContent='0';$('room-tab-count').textContent='0';$('details-toggle').disabled=true;$('room-actions-toggle').disabled=true;$('lock-button').disabled=true;friends=[];friendRetries.clear();friendGeneration++;$('friend-list').replaceChildren();$('talk-button').hidden=true;$('reconnect-panel').hidden=true;searchGeneration++;replyDrafts.clear();messageCache.clear();searchRoom=null;notificationRoom=null;$('search-results').replaceChildren();$('search-query').value='';$('search-status').textContent='';$('room-notifications-name').textContent='';renderReply();
   historyLoading=false;$('history-context').hidden=true;
   clearTimeout(readTimer);clearTimeout(viewTimer);readTimer=null;pointerAttentionUntil=0;readMarkers.clear();selectedMentions.clear();closeMentions();
   window.OchatWorkspace?.reset();
@@ -521,7 +529,7 @@ function render(next) {
   if (!unlocked || !state) return;
   const room = rooms.find(r => r.id === selectedRoom) || (state.room?.id === selectedRoom ? state.room : null);
   $('activity-button').disabled=false;
-  $('settings-button').disabled=false;$('navigation-toggle').disabled=false;$('friends-button').disabled=false;syncFriendRequest();$('friends-own-id').textContent=state.id.slice(0,8);$('friends-own-id').title=state.id;$('copy-contact-id').disabled=!!$('copy-contact-id').dataset.busy;$('lock-button').disabled=false;$('details-toggle').disabled=!selectedRoom;$('room-actions-toggle').disabled=!selectedRoom; $('profile-name').textContent = state.name; profileAvatar($('profile-avatar'),state.name,state.avatar_hash,state.id); $('profile-status').textContent = 'Your account';
+  $('settings-button').disabled=false;$('navigation-toggle').disabled=false;$('friends-button').disabled=false;syncFriendRequest();$('friends-own-id').textContent=state.id.slice(0,8);$('friends-own-id').title=state.id;$('copy-contact-id').disabled=!!$('copy-contact-id').dataset.busy;$('lock-button').disabled=false;$('details-toggle').disabled=!selectedRoom;$('room-actions-toggle').disabled=!selectedRoom; $('profile-name').textContent = state.name; profileAvatar($('profile-avatar'),state.name,state.avatar_hash,state.id);
   renderIdentity(room);
   for (const id of ['new-room','new-direct-chat','join-button','settings-button','lock-button','emoji-button']) $(id).disabled = false;
   $('invite-button').disabled = !isActiveRoom() || !!$('invite-button').dataset.busy;
@@ -532,15 +540,17 @@ function render(next) {
   $('forget-room').disabled = !selectedRoom;$('clear-history').disabled = !selectedRoom;$('search-button').disabled = false;$('room-notifications-button').disabled = !selectedRoom;renderReply();
   $('delete-room').hidden = !room || room.owner !== state.id;
   const members = conversationContext(selectedRoom).members;
-  $('member-total').textContent = `${isActiveRoom() ? state.peers.length + 1 : 0} online`;
-  $('network-note').textContent = settings?.tor_enabled ? 'Encrypted relay through Tor. Direct connections disabled.' : settings?.relay_only ? 'Encrypted Iroh relay only. Direct connections disabled.' : state.relay_enabled ? 'Direct connections preferred. Encrypted relay when needed.' : 'Direct connections only. Some networks may block connections.';
+  const memberCount=members.length+1,onlineCount=members.filter(member=>member.online).length+(isActiveRoom()?1:0),routes=isActiveRoom()?state.peers.filter(peer=>peer.online!==false).map(peer=>peer.route):[];
+  const transport=settings?.tor_enabled?'Tor relay':settings?.relay_only||routes.includes('relay')?'Relay':routes.length?'Direct':'';
+  $('member-total').textContent=String(memberCount);
+  $('details-room-summary').textContent=`${memberCount} member${memberCount===1?'':'s'} · ${onlineCount} online`;
+  $('details-encryption-label').textContent=transport?`Encrypted · ${transport}`:'Encrypted';
+  $('details-encryption').title = settings?.tor_enabled ? 'Encrypted relay through Tor. Direct connections disabled.' : settings?.relay_only ? 'Encrypted Iroh relay only. Direct connections disabled.' : state.relay_enabled ? 'Direct connections preferred. Encrypted relay when needed.' : 'Direct connections only. Some networks may block connections.';
   const peers = [...state.peers].sort((a,b) => a.id.localeCompare(b.id));
-  const key = JSON.stringify([selectedRoom,isActiveRoom(),state.name,state.avatar_hash,state.voice,state.speaking,members,friends]);
-  if (key !== membersKey) { membersKey=key;const list=selectedRoom?[{id:state.id,name:`${state.name} (you)`,tor_enabled:!!settings?.tor_enabled,avatar_hash:state.avatar_hash,voice:state.voice,speaking:state.speaking,online:isActiveRoom(),route:'self'},...[...members].sort((a,b)=>Number(b.online!==false)-Number(a.online!==false)||a.name.localeCompare(b.name))]:[];syncKeyed($('members'),list,p=>p.id,createMember,updateMember);if(!list.length)emptyList($('members'),'No participants.');window.OchatProfiles?.groups(); }
+  const key = JSON.stringify([selectedRoom,isActiveRoom(),state.name,state.avatar_hash,state.voice,state.voice_channel,state.channels,settings?.availability,state.speaking,members,friends]);
+  if (key !== membersKey) { membersKey=key;const sorted=[...members].sort((a,b)=>Number(b.online!==false)-Number(a.online!==false)||a.name.localeCompare(b.name));const list=selectedRoom?[...sorted.filter(peer=>peer.online!==false),{id:state.id,name:state.name,self:true,tor_enabled:!!settings?.tor_enabled,avatar_hash:state.avatar_hash,voice:state.voice,voice_channel:state.voice_channel,availability:settings?.availability,speaking:state.speaking,online:isActiveRoom(),route:'self'},...sorted.filter(peer=>peer.online===false)]:[];syncKeyed($('members'),list,p=>p.id,createMember,updateMember);if(!list.length)emptyList($('members'),'No participants.');window.OchatProfiles?.groups(); }
   const privateRoom = room?.capacity === 2;
   const otherVoice=activeVoice()?.room?.id!==selectedRoom ? activeVoice() : null;
-  $('voice-heading').textContent = privateRoom ? 'Private call' : 'Group voice';
-  $('voice-description').textContent = state.voice ? (privateRoom ? 'Your private call is connected.' : 'You are connected to this voice room.') : privateRoom ? 'The other participant chooses whether to accept.' : 'Everyone joins voluntarily. Your microphone stays off until you join.';
   $('voice-button').textContent = privateRoom ? 'Call' : state.voice ? 'Voice connected' : 'Join voice';
   $('voice-button').disabled = state.permissions?.calls===false || !isActiveRoom() || state.voice || !!state.call || !!otherVoice || (privateRoom && !state.peers.length) || !!$('voice-button').dataset.busy;
   $('voice-button').title=otherVoice?`Leave voice in ${conversationContext(otherVoice.room.id).title} first`:!isActiveRoom()?'Reconnect to use voice':privateRoom && !state.peers.length?'The other participant must be online':privateRoom?'Start a private call':'Join group voice';

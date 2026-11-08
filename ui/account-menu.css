@@ -1,0 +1,43 @@
+/* Account block: one status button, then lock and settings. */
+.discord-shell #account-controls{position:relative;margin:0 8px 8px;padding:6px;border-radius:10px;background:var(--account);color:var(--text)}
+.discord-shell #account-controls .profile{display:flex;align-items:center;gap:4px;min-width:0;margin:0;padding:0;border:0}
+.discord-shell #account-menu-toggle{--presence-cutout:var(--account);display:flex;flex:1;align-items:center;gap:10px;min-width:0;min-height:0;height:auto;margin:0;padding:4px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.discord-shell #account-menu-toggle:hover:not(:disabled),.discord-shell #account-menu-toggle[aria-expanded=true]{background:color-mix(in srgb,var(--text) 4%,transparent)}
+.discord-shell #account-menu-toggle:disabled{opacity:1;cursor:default}
+.discord-shell #account-menu-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.discord-shell #profile-avatar{width:36px;height:36px;min-width:36px;font-size:12px}
+.discord-shell #profile-avatar>.presence-dot{inset:auto -3px -3px auto!important;width:17px!important;height:17px!important;border-width:3px!important}
+.account-identity{display:block;flex:1;min-width:0}
+.discord-shell #account-menu-toggle .account-identity strong{display:block;overflow:hidden;font-size:14px;font-weight:700;line-height:18px;text-overflow:ellipsis;white-space:nowrap}
+.discord-shell #account-menu-toggle .account-status-line{display:flex;align-items:center;gap:6px;min-width:0;margin:0;color:var(--muted);font-size:12px;line-height:16px}
+#profile-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.discord-shell #account-menu-toggle .account-chevron{flex:none;width:10px;height:10px;stroke-width:2.4}
+#account-menu-toggle:disabled .account-chevron{display:none}
+.discord-shell #account-controls #lock-button,.discord-shell #account-controls #settings-button{display:grid;flex:none;place-items:center;width:34px;min-width:34px;height:34px;min-height:0;padding:0;border:0;border-radius:6px;background:transparent;box-shadow:none;color:var(--muted);font-size:0}
+.discord-shell #account-controls #lock-button:hover:not(:disabled),.discord-shell #account-controls #settings-button:hover:not(:disabled){background:var(--hover);color:var(--text)}
+.account-controls svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* Status menu: opens above the account block, over the navigation links. */
+.account-status-menu{position:absolute;right:0;bottom:calc(100% + 6px);left:0;z-index:100;box-sizing:border-box;max-height:calc(100dvh - 120px);overflow:auto;padding:8px;border:1px solid var(--hairline,var(--line));border-radius:12px;background:var(--account);box-shadow:var(--shadow-floating,0 12px 32px #0004);--presence-cutout:var(--account)}
+.account-status-menu[hidden]{display:none!important}
+.account-status-heading{padding:6px 8px 8px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:14px;text-transform:uppercase}
+.discord-shell #account-status-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;margin:0;padding:0 9px;border:0;border-radius:6px;background:transparent;box-shadow:none;color:var(--text);font:inherit;font-size:14px;text-align:left}
+.discord-shell #account-status-menu button:hover{background:var(--hover)}
+.discord-shell #account-status-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.account-status-label{flex:1;min-width:0}
+.account-status-check{flex:none;visibility:hidden;color:var(--accent)}
+[aria-checked=true]>.account-status-check{visibility:visible}
+.account-status-divider{height:1px;margin:6px 8px;background:var(--hairline,var(--line))}
+.discord-shell #account-status-menu #copy-my-contact-id{min-height:36px;color:var(--muted);font-size:13px}
+.discord-shell #account-status-menu #copy-my-contact-id:hover{color:var(--text)}
+#copy-my-contact-id::before{content:'';flex:none;width:14px;height:14px;background:currentColor;-webkit-mask:url('icons/copy.svg') center/contain no-repeat;mask:url('icons/copy.svg') center/contain no-repeat}
+
+/* Bottom navigation links share the Activity row treatment. */
+#navigation-dialog .sidebar-bottom{padding:8px}
+#navigation-dialog .sidebar-bottom>.sidebar-action{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:8px 10px;border-radius:4px;color:var(--muted);font-size:13px;font-weight:500}
+#navigation-dialog .sidebar-bottom>.sidebar-action:hover:not(:disabled){background:var(--hover);color:var(--text)}
+#navigation-dialog .sidebar-bottom>.sidebar-action::before{content:'';flex:none;width:18px;height:18px;background:currentColor;-webkit-mask:var(--row-icon) center/contain no-repeat;mask:var(--row-icon) center/contain no-repeat}
+#archived-conversations-button{--row-icon:url('icons/archive.svg')}
+#transfers-button{--row-icon:url('icons/transfers.svg')}
+#privacy-button{--row-icon:url('icons/shield.svg')}
+@media(forced-colors:active){#navigation-dialog .sidebar-bottom>.sidebar-action::before,#copy-my-contact-id::before{forced-color-adjust:none;background:ButtonText}}

@@ -16,7 +16,7 @@ test('macOS capture denial identifies the relevant privacy setting without retry
  }
  assert.equal(captures,2);assert.equal(a.calls.some(([command])=>command==='start_visual'),false);
 });
-const source = fs.readFileSync('ui/vendor/twemoji/twemoji.min.js','utf8')+'\n'+fs.readFileSync('ui/emoji-renderer.js','utf8')+'\n'+fs.readFileSync('ui/profiles.js','utf8')+'\n'+fs.readFileSync('ui/community.js','utf8')+'\n'+fs.readFileSync('ui/discord.js','utf8')+'\n'+fs.readFileSync('ui/presentation.js','utf8')+'\n'+fs.readFileSync('ui/video-renderer.js','utf8')+'\n'+fs.readFileSync('ui/media.js','utf8')+'\n'+fs.readFileSync('ui/features.js','utf8')+'\n'+fs.readFileSync('ui/meme-picker.js','utf8')+'\n'+fs.readFileSync('ui/personalization.js','utf8')+'\n'+fs.readFileSync('ui/passwords.js','utf8')+'\n'+fs.readFileSync('ui/timeline-scroll.js','utf8')+'\n'+fs.readFileSync('ui/photo-crop.js','utf8')+'\n'+fs.readFileSync('ui/emoji-popover.js','utf8')+'\n'+fs.readFileSync('ui/rich-text.js','utf8')+'\n'+fs.readFileSync('ui/message-media.js','utf8')+'\n'+fs.readFileSync('ui/app.js','utf8')+'\n'+fs.readFileSync('ui/organization.js','utf8')+'\n'+fs.readFileSync('ui/presence.js','utf8')+'\n'+fs.readFileSync('ui/workspace.js','utf8')+'\n'+fs.readFileSync('ui/native-controls.js','utf8')+'\n'+fs.readFileSync('ui/conversation-create.js','utf8');
+const source = fs.readFileSync('ui/vendor/twemoji/twemoji.min.js','utf8')+'\n'+fs.readFileSync('ui/emoji-renderer.js','utf8')+'\n'+fs.readFileSync('ui/profiles.js','utf8')+'\n'+fs.readFileSync('ui/community.js','utf8')+'\n'+fs.readFileSync('ui/discord.js','utf8')+'\n'+fs.readFileSync('ui/presentation.js','utf8')+'\n'+fs.readFileSync('ui/video-renderer.js','utf8')+'\n'+fs.readFileSync('ui/media.js','utf8')+'\n'+fs.readFileSync('ui/features.js','utf8')+'\n'+fs.readFileSync('ui/meme-picker.js','utf8')+'\n'+fs.readFileSync('ui/personalization.js','utf8')+'\n'+fs.readFileSync('ui/passwords.js','utf8')+'\n'+fs.readFileSync('ui/timeline-scroll.js','utf8')+'\n'+fs.readFileSync('ui/photo-crop.js','utf8')+'\n'+fs.readFileSync('ui/emoji-popover.js','utf8')+'\n'+fs.readFileSync('ui/rich-text.js','utf8')+'\n'+fs.readFileSync('ui/message-media.js','utf8')+'\n'+fs.readFileSync('ui/app.js','utf8')+'\n'+fs.readFileSync('ui/organization.js','utf8')+'\n'+fs.readFileSync('ui/presence.js','utf8')+'\n'+fs.readFileSync('ui/account-menu.js','utf8')+'\n'+fs.readFileSync('ui/workspace.js','utf8')+'\n'+fs.readFileSync('ui/native-controls.js','utf8')+'\n'+fs.readFileSync('ui/conversation-create.js','utf8');
 const html = fs.readFileSync('ui/index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const settings = {theme:'system',audio:{input_device:null,output_device:null,input_volume:1,output_volume:1,noise_suppression:true,echo_cancellation:true,automatic_gain:true},message_sound:true,ringtone:true,sound_volume:0.35,relay_enabled:false};
 const base = {id:'self',name:'Test',room:null,peers:[],voice:false,muted:false,relay_enabled:false,call:null};
@@ -171,7 +171,7 @@ async function setup(t,nativeWindow,captureCapabilities={native:false}) {
 
 test('room profiles float independently, keep members visible and restore focus',async t=>{
  const a=await setup(t);a.session({...channelRoom,peers:[{...connected.peers[0],bio:'Hello 👨🏽‍💻',latency_ms:26}]});a.get('details-toggle').click();const member=a.get('members').querySelector('[data-key="peer"] .member-profile');member.focus();member.click();
- assert.equal(a.get('floating-profile').open,true);assert.equal(a.get('details-dialog').open,true);assert.equal(a.get('participants-section').hidden,false);assert.equal(a.get('details-overview').hidden,false);assert.equal(a.get('details-title').textContent,'Group details');assert.equal(a.get('floating-profile').contains(a.get('peer-card')),true);assert.equal(a.get('peer-connection').textContent,'Direct · 26 ms');
+ assert.equal(a.get('floating-profile').open,true);assert.equal(a.get('details-dialog').open,true);assert.equal(a.get('participants-section').hidden,false);assert.equal(a.get('details-overview').hidden,false);assert.equal(a.get('details-title').textContent,'Details');assert.equal(a.get('floating-profile').contains(a.get('peer-card')),true);assert.equal(a.get('peer-connection').textContent,'Direct · 26 ms');
  a.get('floating-profile').dispatchEvent(new a.window.Event('cancel',{cancelable:true}));assert.equal(a.get('floating-profile').open,false);assert.equal(a.window.document.activeElement,member);assert.equal(a.get('details-dialog').contains(a.get('peer-card')),true);
  member.click();await a.app.lockAccount();assert.equal(a.get('floating-profile').open,false);assert.equal(a.get('peer-bio').textContent,'');assert.equal(a.get('members').textContent,'');
 });
@@ -192,7 +192,7 @@ test('bio emoji selection replaces only its selection and saves Unicode separate
 });
 
 test('room roster groups presence without replacing member buttons during speaking updates',async t=>{
- const a=await setup(t);const offline={id:'offline',name:'Offline peer',online:false,voice:false};a.session({...channelRoom,members:[...connected.peers,offline]});const member=a.get('members').querySelector('[data-key="peer"] .member-profile');assert.deepEqual([...a.get('members').querySelectorAll('.member-group-title')].map(n=>n.textContent),['Online — 2','Offline — 1']);a.session({...channelRoom,peers:[{...connected.peers[0],speaking:true,voice:true}],members:[...connected.peers,offline]});assert.equal(a.get('members').querySelector('[data-key="peer"] .member-profile'),member);
+ const a=await setup(t);const offline={id:'offline',name:'Offline peer',online:false,voice:false};a.session({...channelRoom,members:[...connected.peers,offline]});const member=a.get('members').querySelector('[data-key="peer"] .member-profile');assert.deepEqual([...a.get('members').querySelectorAll('.member-group-title')].map(n=>n.textContent),['Offline — 1']);a.session({...channelRoom,peers:[{...connected.peers[0],speaking:true,voice:true}],members:[...connected.peers,offline]});assert.equal(a.get('members').querySelector('[data-key="peer"] .member-profile'),member);
 });
 test('offline conversations queue messages while a missing conversation retains the draft',async t=>{
   const a=await setup(t);a.session(base);a.input('My draft');a.submit();assert.match(a.get('toast').textContent,/Choose a conversation/);assert.equal(a.calls.filter(([c])=>c==='send_text').length,0);
@@ -307,7 +307,7 @@ test('profile photos appear beside peers and are cleared from the interface on l
 
 test('voice disconnect is next to the voice room and stays out of the message composer',async t=>{
   const a=await setup(t);a.session({...connected,room:{...connected.room,capacity:0},voice:true});
-  assert.ok(a.get('voice-label').parentElement.contains(a.get('stop-voice')));assert.equal(a.get('composer').contains(a.get('stop-voice')),false);assert.equal(a.get('stop-voice').hidden,false);assert.equal(a.get('voice-button').hidden,true);
+  assert.ok(a.get('voice-label').closest('.dock-heading').contains(a.get('stop-voice')));assert.equal(a.get('composer').contains(a.get('stop-voice')),false);assert.equal(a.get('stop-voice').hidden,false);assert.equal(a.get('voice-button').hidden,true);
   a.get('stop-voice').click();await flush();assert.ok(a.calls.some(([c])=>c==='stop_voice'));
 });
 
@@ -1301,9 +1301,48 @@ test('room access exposes role permissions and controlled invitation options',as
  const open=[...a.get('room-actions-dialog').querySelectorAll('button')].find(b=>b.textContent==='Roles & invitations…');open.click();await flush();assert.equal(a.get('room-management').open,true);const role=a.get('role-members').querySelector('[data-peer="peer"]');role.value='moderator';a.get('save-room-access').click();await flush();const saved=a.calls.find(([c])=>c==='save_room_roles');assert.equal(saved[1].roles.peer,'moderator');assert.equal(saved[1].permissions.member.channels,false);a.get('invite-lifetime').value='3600';a.get('invite-uses').value='5';a.get('create-controlled-invite').click();await flush();assert.ok(a.calls.some(([c,args])=>c==='create_controlled_invitation'&&args.maximumUses===5&&args.lifetimeSeconds===3600));
  await a.app.lockAccount();assert.equal(a.get('room-management').open,false);assert.equal(a.get('role-members').children.length,0);assert.equal(a.get('controlled-invitation-output').value,'');
 });
+test('group details summarize the room and show role, activity and connection on each member row',async t=>{
+ const a=await setup(t);const peers=[{...connected.peers[0],id:'good',name:'Good',role:'member',latency_ms:120,voice:true,voice_channel:'lounge',route:'relay'},{...connected.peers[0],id:'poor',name:'Poor',role:'moderator',latency_ms:563,voice:false,voice_channel:null,availability:'away',route:'relay'}];
+ a.session({...channelRoom,channels:[{id:'lounge',name:'Lounge',kind:'voice',order:0}],role:'owner',peers,members:peers.map(p=>({...p}))});await flush();
+ assert.equal(a.get('member-total').textContent,'3');assert.equal(a.get('details-room-summary').textContent,'3 members · 3 online');assert.equal(a.get('details-encryption-label').textContent,'Encrypted · Relay');
+ const rows=[...a.get('members').querySelectorAll('.member')],byName=name=>rows.find(row=>row.querySelector('.member-name>span').textContent===name);
+ assert.deepEqual(rows.map(row=>row.querySelector('.member-name>span').textContent),['Good','Poor','Test']);
+ assert.equal(byName('Test').querySelector('.member-you').textContent,'you');assert.equal(byName('Good').querySelector('.member-you').textContent,'');
+ assert.equal(byName('Good').querySelector('.member-meta').textContent,'In Lounge');assert.equal(byName('Poor').querySelector('.member-meta').textContent,'Away');
+ assert.equal(byName('Poor').querySelector('.member-details .member-role').textContent,'Moderator');
+ assert.equal(byName('Good').querySelector('.member-signal').dataset.quality,'good');assert.equal(byName('Good').querySelector('.voice-peer-ping').textContent,'120 ms');
+ assert.equal(byName('Poor').querySelector('.member-signal').dataset.quality,'poor');assert.match(byName('Poor').querySelector('.member-profile').getAttribute('aria-description'),/Poor connection, 563 milliseconds/);
+ assert.equal(byName('Test').querySelector('.member-signal').dataset.quality,'good');assert.equal(byName('Test').querySelector('.voice-peer-ping').hidden,true);
+ assert.deepEqual([...a.get('members').querySelectorAll('.member-group-title')].map(n=>n.textContent),[]);
+});
+test('voice card shows state, room and icon controls, and marks the joined channel',async t=>{
+ const a=await setup(t);a.session({...channelRoom,voice:true,voice_channel:'voice-general',voice_started_at:Date.now()-5000});await flush();
+ assert.equal(a.get('voice-bar').hidden,false);assert.equal(a.get('voice-state').textContent,'Voice connected');assert.equal(a.get('voice-label').textContent,'Studio → General');
+ assert.equal(a.get('stop-voice').textContent,'Leave');assert.equal(a.get('voice-bar').querySelector('.dock-heading').contains(a.get('voice-diagnostics-button')),true);
+ const joined=a.window.document.querySelectorAll('.channel-select.voice-connected');assert.equal(joined.length,1);assert.equal(joined[0].querySelector('.channel-name').textContent,'General');
+ a.session({...connected,voice:true,call:{id:'call',peer:'peer',status:'outgoing'}});await flush();assert.equal(a.get('voice-state').textContent,'Connecting…');
+ await a.app.lockAccount();assert.equal(a.get('voice-state').textContent,'Voice connected');assert.equal(a.get('voice-label').textContent,'');
+});
+test('account button shows availability and opens the status menu',async t=>{
+ const a=await setup(t);a.session(connected);await flush();
+ const toggle=a.get('account-menu-toggle'),menu=a.get('account-status-menu'),item=value=>menu.querySelector(`[data-availability="${value}"]`);
+ assert.equal(a.window.document.getElementById('availability-select'),null);
+ assert.equal(a.get('profile-status').textContent,'Available');assert.equal(toggle.disabled,false);assert.equal(menu.hidden,true);
+ assert.equal(item('available').getAttribute('aria-checked'),'true');
+ toggle.click();assert.equal(menu.hidden,false);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(a.window.document.activeElement,item('available'));
+ a.window.document.dispatchEvent(new a.window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert.equal(a.window.document.activeElement,item('away'));
+ a.window.document.dispatchEvent(new a.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.hidden,true);assert.equal(a.window.document.activeElement,toggle);
+ toggle.click();item('available').click();await flush();assert.equal(a.calls.some(([c])=>c==='set_availability'),false);assert.equal(menu.hidden,true);
+ toggle.click();item('invisible').click();await flush();await flush();
+ assert.equal(a.calls.find(([c])=>c==='set_availability')[1].status,'invisible');
+ assert.equal(a.get('profile-status').textContent,'Invisible');assert.equal(a.get('profile-avatar').querySelector('.presence-dot').dataset.status,'invisible');
+ assert.equal(item('invisible').getAttribute('aria-checked'),'true');assert.equal(item('available').getAttribute('aria-checked'),'false');
+ toggle.click();a.get('copy-my-contact-id').click();await flush();await flush();assert.equal(menu.hidden,true);assert.ok(a.calls.some(([c])=>c==='contact_id'));
+ toggle.click();await a.app.lockAccount();assert.equal(menu.hidden,true);assert.equal(toggle.disabled,true);assert.equal(a.get('profile-status').textContent,'Private peer-to-peer messaging');
+});
 test('privacy dashboard and availability controls stay local and clear on lock',async t=>{
  const a=await setup(t);a.session(connected);const previous=a.window.__TAURI__.core.invoke;a.window.__TAURI__.core.invoke=async(c,args)=>c==='privacy_dashboard'?{tor_enabled:true,tor_ready:true,relay_enabled:true,external_previews:false,sessions:[{room:{name:'Group'},peers:[{id:'peer',name:'Peer',route:'relay',latency_ms:50}]}],blocked:['blocked-id']}:previous(c,args);
- await a.window.OchatWorkspace.openDashboard();assert.match(a.get('privacy-summary').textContent,/direct fallback disabled/);assert.match(a.get('blocked-contacts').textContent,/blocked-id/);a.get('availability-select').value='busy';a.get('availability-select').dispatchEvent(new a.window.Event('change'));await flush();assert.ok(a.calls.some(([c,args])=>c==='set_availability'&&args.status==='busy'));await a.app.lockAccount();assert.equal(a.get('privacy-dashboard').open,false);assert.equal(a.get('privacy-connections').textContent,'');assert.equal(a.get('blocked-contacts').textContent,'');
+ await a.window.OchatWorkspace.openDashboard();assert.match(a.get('privacy-summary').textContent,/direct fallback disabled/);assert.match(a.get('blocked-contacts').textContent,/blocked-id/);a.get('account-menu-toggle').click();a.get('account-status-menu').querySelector('[data-availability="busy"]').click();await flush();assert.ok(a.calls.some(([c,args])=>c==='set_availability'&&args.status==='busy'));await a.app.lockAccount();assert.equal(a.get('privacy-dashboard').open,false);assert.equal(a.get('privacy-connections').textContent,'');assert.equal(a.get('blocked-contacts').textContent,'');
 });
 
 test('an invitation response arriving after Lock cannot repopulate private fields',async t=>{
@@ -1480,6 +1519,7 @@ test('private call cards retain identities and update measured routes without re
  assert.equal(a.get('voice-bar').classList.contains('private-call'),true);
  assert.equal(roster.children.length,2);
  assert.equal(self.querySelector('.call-person-connection').textContent,'This device');
+ assert.equal(self.classList.contains('is-self'),true);assert.equal(remote.classList.contains('is-self'),false);
  assert.equal(remote.querySelector('.voice-person-name').textContent,'Peer');
  assert.equal(remote.querySelector('.call-person-connection').textContent,'Direct · 42 ms');
  a.session({...call,peers:[{...call.peers[0],route:'relay',latency_ms:90}]});

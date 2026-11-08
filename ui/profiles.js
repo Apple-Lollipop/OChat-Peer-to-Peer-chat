@@ -26,7 +26,7 @@
   }
   function groups(){
     const list=$('members');for(const heading of list.querySelectorAll('.member-group-title'))heading.remove();
-    for(const [offline,label]of [[false,'Online'],[true,'Offline']]){const rows=[...list.querySelectorAll('.member')].filter(row=>row.classList.contains('offline')===offline);if(rows.length){const heading=node('h4','member-group-title',label+' — '+rows.length);rows[0].before(heading);}}
+    const offline=list.querySelectorAll('.member.offline');if(offline.length)offline[0].before(node('h4','member-group-title','Offline — '+offline.length));
   }
   function bioChanged(){
     const input=$('profile-bio-input'),preview=$('bio-preview-text');preview.textContent=input.value||'Your bio will appear here.';preview.classList.toggle('empty',!input.value);
