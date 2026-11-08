@@ -52,9 +52,9 @@ html{background:transparent}
 .discord-shell .inline-image{min-width:0;max-width:100%;align-items:flex-start}
 .discord-shell .inline-image img{max-width:min(var(--chat-image-size,240px),100%);max-height:var(--chat-image-size,240px);width:auto;height:auto;object-fit:contain}
 .discord-shell .channel-people{padding:4px 6px 8px 24px}
-.discord-shell .channel-person{gap:9px;min-height:38px;padding:4px;text-align:left}
-.discord-shell .channel-person .avatar{width:28px;height:28px;min-width:28px}
-.discord-shell .channel-person-name{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+.discord-shell .channel-person{flex-wrap:wrap;gap:6px;min-height:38px;padding:4px;text-align:left}
+.discord-shell .channel-person .avatar{width:28px;height:28px;min-width:28px;margin-inline-end:3px}
+.discord-shell .channel-person-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;flex:1;min-width:40px;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .discord-shell .channel-person .speaking-dot{margin-left:auto;flex-shrink:0}
 .discord-shell #details-dialog #members .member-name,
 .discord-shell #details-dialog #members .member-name>span:first-child{max-width:none;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:normal}

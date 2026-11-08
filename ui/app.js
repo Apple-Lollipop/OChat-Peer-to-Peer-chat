@@ -583,7 +583,7 @@ function renderComposer() {
   const queued = !!selectedRoom && (!isActiveRoom() || !state.peers.length), deliveryText = !queued ? '' : context.direct ? 'Delivered when you’re both online' : 'Delivered when members are online';
   $('composer-delivery-hint').hidden = !queued;$('composer-delivery-hint').title = queued ? `Encrypted and queued. Delivered automatically once you and ${context.title} are online.` : '';
   if ($('composer-delivery-text').textContent !== deliveryText) $('composer-delivery-text').textContent = deliveryText;
-  const status = !selectedRoom ? 'Local draft · choose a friend or open a room to send.' : queued ? '' : !connected ? 'Choose a text channel to send.' : context.direct ? '' : `To everyone in ${context.title}`;
+  const status = !selectedRoom ? 'Local draft · choose a friend or open a room to send.' : queued ? '' : !connected ? 'Choose a text channel to send.' : '';
   if ($('composer-status').textContent !== status) $('composer-status').textContent = status;
 }
 function normalizeLayout(value) {

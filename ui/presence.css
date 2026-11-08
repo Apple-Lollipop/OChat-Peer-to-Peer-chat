@@ -23,6 +23,7 @@
 @media(forced-colors:active){.member-role{border-color:CanvasText;color:CanvasText}.voice-state-badges{color:CanvasText}}
 /* Stable activity feedback: the worker supplies the activity state; CSS never pulses. */
 .discord-shell [data-voice-speaking] .speaking-dot{display:inline-flex!important;align-items:center;justify-content:center;width:20px!important;height:20px!important;min-width:20px;flex:0 0 20px;border-radius:50%;background:transparent!important;box-shadow:none!important;animation:none!important;visibility:hidden;opacity:0;color:var(--success,#23a55a)}
+.discord-shell .channel-person[data-voice-muted=true] .speaking-dot{display:none!important}
 .discord-shell [data-voice-speaking=true] .speaking-dot{visibility:visible;opacity:1;background:color-mix(in srgb,var(--success,#23a55a) 14%,transparent)!important}
 .discord-shell [data-voice-speaking] .speaking-dot svg{display:block;width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .discord-shell [data-voice-speaking=true] .avatar{outline:2px solid var(--success,#23a55a);outline-offset:2px;box-shadow:0 0 0 5px color-mix(in srgb,var(--success,#23a55a) 13%,transparent)}

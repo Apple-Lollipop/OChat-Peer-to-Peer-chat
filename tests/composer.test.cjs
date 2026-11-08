@@ -199,6 +199,9 @@ test('offline conversations queue messages while a missing conversation retains 
   a.session(connected);assert.equal(a.get('composer-delivery-hint').hidden,true);a.session({...connected,peers:[]});assert.equal(a.get('message').disabled,false);assert.equal(a.get('send-button').disabled,false);assert.equal(a.get('composer-status').textContent,'');assert.equal(a.get('composer-delivery-hint').hidden,false);assert.match(a.get('composer-delivery-text').textContent,/both online/);a.submit();await flush();assert.equal(a.calls.filter(([c])=>c==='send_text').length,1);assert.equal(a.get('message').value,'');
   a.input('Another draft');a.session(connected);assert.equal(a.get('message').value,'Another draft');a.session({...connected,peers:[]});assert.equal(a.get('send-button').disabled,false);
 });
+test('group conversations show no recipient label under the composer',async t=>{
+  const a=await setup(t);a.session({...connected,room:{id:'group',name:'Team',capacity:8}});assert.equal(a.get('conversation-kind').textContent,'Group conversation');assert.equal(a.get('composer-status').textContent,'');assert.equal(a.get('send-button').title,'Send to Team');
+});
 test('empty drafts are blocked and successful sends clear the composer',async t=>{
   const a=await setup(t);a.session(connected);assert.equal(a.get('send-button').disabled,true);a.submit();assert.equal(a.calls.filter(([c])=>c==='send_text').length,0);
   a.input('Hello peer');assert.equal(a.get('send-button').disabled,false);a.submit();await flush();assert.equal(a.calls.find(([c])=>c==='send_text')[1].text,'Hello peer');assert.equal(a.get('message').value,'');assert.equal(a.get('send-button').disabled,true);
