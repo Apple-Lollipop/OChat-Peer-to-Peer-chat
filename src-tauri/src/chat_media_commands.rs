@@ -58,12 +58,19 @@ async fn source(
     peer: &str,
     id: Uuid,
 ) -> Reply<Option<ChatMediaSource>> {
+    let account = vault(state).await?;
+    if account
+        .get::<ochat_core::message_tools::Update>(&format!("updates/{room}/{peer}/{id}/edit"))
+        .map_err(error)?
+        .is_some_and(|update| update.deleted())
+    {
+        return Ok(None);
+    }
     if let Ok(client) = node(state).await?.room_node(room) {
         if client.read_offered_file(id, 0, 0).map_err(error)?.is_some() {
             return Ok(Some(ChatMediaSource::Offered(client)));
         }
     }
-    let account = vault(state).await?;
     if let Some(video) = StoredMedia::open(&account, room, peer, id).map_err(error)? {
         return Ok(Some(ChatMediaSource::Stored(video)));
     }

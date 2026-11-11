@@ -41,3 +41,5 @@ pub mod network_exports {
 }
 
 pub mod photo;
+
+pub mod voice_message;

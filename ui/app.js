@@ -260,7 +260,11 @@ function renderFriends() {
       row.dataset.peer=friend.peer;row.dataset.online=String(online);if(friend.direct_room)row.dataset.room=friend.direct_room;row.dataset.search=(person.name+' '+friend.peer).toLocaleLowerCase();profile.type='button';profile.title='View profile';profile.onclick=()=>showPeer(friend.peer,person.name,friend.direct_room,profile);profileAvatar(avatar,person.name,person.avatar_hash,person.id);avatar.dataset.tone=friendTone(friend.peer);avatar.setAttribute('aria-hidden','true');dot.setAttribute('role','img');dot.setAttribute('aria-label',online?'Online':'Offline');avatar.append(dot);name.append(el('strong','',person.name));window.OchatCommunity?.badge(name,person);details.append(name);profile.append(avatar,details);row.append(profile);
       if(friend.status==='accepted'){
         details.append(el('small','friend-presence',online?'Online':'Offline'));
-        const controls=el('div','friend-controls'),message=el('button','text-button friend-message','Message'),remove=el('button','text-button danger','Remove');message.type='button';message.title='Message';message.setAttribute('aria-label',`Message ${person.name}`);message.onclick=()=>action(message,()=>messageFriend(friend));remove.onclick=()=>confirm('Remove friend?',`Remove ${friend.name} from your friends? Saved messages remain on this device.`,'Remove',async()=>{await invoke('respond_friend',{peer:friend.peer,accept:false});await refreshFriends();});controls.append(message,remove);row.append(controls);
+        const openConversation=()=>action(profile,()=>messageFriend(friend));
+        profile.title=`Message ${person.name}`;profile.setAttribute('aria-label',`Message ${person.name}`);profile.onclick=openConversation;
+        row.classList.add('friend-conversation-row');
+        row.onclick=event=>{if(!event.target.closest('button,a,input,select,textarea,details,[role=button]'))openConversation();};
+        const controls=el('div','friend-controls'),message=el('button','text-button friend-message','Message'),remove=el('button','text-button danger','Remove');message.type='button';message.title='Message';message.setAttribute('aria-label',`Message ${person.name}`);message.onclick=openConversation;const viewProfile=el('button','text-button friend-profile-action','View profile');viewProfile.type='button';viewProfile.setAttribute('aria-label',`View profile of ${person.name}`);viewProfile.onclick=()=>{const menu=viewProfile.closest('details'),opener=menu?.querySelector('summary')||viewProfile;if(menu)menu.open=false;showPeer(friend.peer,person.name,friend.direct_room,opener);};remove.onclick=()=>confirm('Remove friend?',`Remove ${friend.name} from your friends? Saved messages remain on this device.`,'Remove',async()=>{await invoke('respond_friend',{peer:friend.peer,accept:false});await refreshFriends();});controls.append(message,viewProfile,remove);row.append(controls);
       }else if(friend.status==='incoming'){
         details.append(el('small','','Wants to add you'));const controls=el('div','friend-controls');for(const accept of [true,false]){const button=el('button','text-button',accept?'Accept':'Decline');button.type='button';button.onclick=()=>action(button,async()=>{await invoke('respond_friend',{peer:friend.peer,accept});await refreshFriends();});controls.append(button);}row.append(controls);
       }else {
@@ -276,6 +280,7 @@ function renderFriends() {
   }
   window.OchatCommunity?.friends({accepted:accepted.length,incoming:incoming.length,outgoing:outgoing.length});
   renderFriendUnread();
+  window.OchatFriendRecency?.render(friends);
 }
 function beginReply(event) {replyDrafts.set(draftKey(),event);renderReply();$('message').focus();}
 function renderReply() {
@@ -471,9 +476,14 @@ function confirm(title, description, label, callback) { $('confirm-title').textC
 function applyTheme(theme = 'system', accent = settings?.accent_color || '#007AFF') { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme;applyAccent(accent);window.OchatPersonalization?.apply(settings?.appearance || {}); }
 function setAuthMode(mode) {
   $('create-account-form').hidden = mode !== 'create'; $('unlock-form').hidden = mode !== 'unlock'; $('import-form').hidden = mode !== 'import';
+  $('account-recovery-choice').hidden = mode !== 'recover'; $('recover-password-form').hidden = mode !== 'recover-key'; $('reset-local-account-form').hidden = mode !== 'reset-account';
+  $('auth-forgot').hidden = mode !== 'unlock';
   $('auth-title').textContent = mode === 'create' ? 'Create your account' : mode === 'unlock' ? 'Welcome back' : 'Import encrypted backup';
   $('auth-description').textContent = mode === 'import' ? 'Restore your profile, messages and emojis on this device.' : 'Your messages stay encrypted on this device.';
-  $('auth-import').hidden = mode === 'import'; $('auth-back').hidden = mode !== 'import'; $('replace-row').hidden = !accountExists;
+  const recoveryTitles = {'recover':'Recover your account','recover-key':'Choose a new password','reset-account':'Start over'};
+  if(recoveryTitles[mode]){$('auth-title').textContent=recoveryTitles[mode];$('auth-description').textContent=mode==='reset-account'?'Delete this account on this device only.':'Choose how to regain access to Ochat.';}
+  $('auth-import').hidden = mode === 'import'; $('auth-back').hidden = mode === 'create' || mode === 'unlock'; $('replace-row').hidden = !accountExists;
+  window.OchatAccountRecovery?.modeChanged(mode);
 }
 async function completeAccount(reply, generation = sessionGeneration) {
   if (generation !== sessionGeneration) { reply.recovery_key = null; return; }
@@ -493,6 +503,8 @@ async function completeAccount(reply, generation = sessionGeneration) {
 }
 function showRecovery(key, required) { if (!unlocked) return; recoveryRequired = required; $('recovery-value').value = key; $('recovery-confirm').checked = false; $('recovery-confirm-row').hidden = !required; $('recovery-done').disabled = required; show('recovery-dialog'); }
 async function lockAccount() {
+  window.OchatFriendRecency?.reset();
+  window.OchatVoiceMessages?.reset();
   window.OchatUpdates?.reset();
   window.OchatDiscordWebhook?.reset();
   window.OchatProductivity?.reset();
@@ -584,6 +596,7 @@ function renderVoiceRoster() {
 setInterval(updateVoiceTimer,1000);
 
 function renderComposer() {
+  window.OchatVoiceMessages?.update();
   const connected = !!selectedRoom && !(Array.isArray(state.channels) && state.room?.capacity!==2 && !state.text_channel);
   const context=conversationContext(selectedRoom);
   $('message').disabled = !unlocked; $('message').placeholder = connected ? `Message ${context.title}…` : context.room ? `Draft for ${context.title}…` : 'Write a draft…';
@@ -628,6 +641,17 @@ function saveLayout(next) {
     }
   });
   return layoutQueue;
+}
+// Private sidebar order follows new exchanges; explicit pins and later manual moves remain meaningful.
+function promotePrivateConversation(id) {
+  if(!unlocked || conversationLayout.pinned.includes(id))return;
+  const all=allRooms(),target=all.find(room=>room.id===id && room.capacity===2);
+  if(!target || conversationLayout.preferences?.[id]?.archived)return;
+  const first=all.find(room=>room.capacity===2 && !conversationLayout.pinned.includes(room.id));
+  if(!first || first.id===id)return;
+  const order=all.map(room=>room.id).filter(room=>room!==id);
+  order.splice(order.indexOf(first.id),0,id);
+  return saveLayout({order,pinned:conversationLayout.pinned});
 }
 function pinConversation(id) {
   const order=allRooms().map(room=>room.id),pinned=new Set(conversationLayout.pinned);
@@ -721,7 +745,7 @@ function renderRooms() {
   syncTaskbarUnread();
   renderFriendUnread();
   window.OchatPersonalization?.badge();
-  const focused=document.activeElement,restoreFocus=$('conversation-tabs').contains(focused);
+  const focused=document.activeElement,restoreFocus=$('conversation-tabs').contains(focused) || !!$('home-direct-tabs')?.contains(focused) || $('direct-room-list').contains(focused);
   const all=allRooms();
   const contexts=all.map(room=>conversationContext(room.id));
   const update=(node,room,tab)=>{
@@ -964,9 +988,12 @@ async function acceptFile(event,accept) {
   return await invoke('resume_transfer',scope) || await invoke('receive_file',{peer:event.peer,id:event.offer.id});
 }
 function addFile(event,live) {
-  const {row,body} = messageFrame(event),card = el('div','file-card'); row.dataset.fileId=event.offer.id;card.dataset.fileId = event.offer.id; card.dataset.peer = event.peer; card.dataset.outgoing = String(event.outgoing); card.append(el('strong','',event.offer.name),el('small','',`${size(event.offer.size)} · BLAKE3 verified on receipt`)); const status = el('div','file-progress',event.outgoing ? 'Offered to participants' : live ? 'Waiting for your approval' : 'Saved file offer · download may no longer be available'); card.append(status,el('div','file-recipients')); window.OchatChatMedia?.attach(card,{room:event.room||selectedRoom,peer:event.peer,id:event.offer.id,name:event.offer.name});
-  if (!event.outgoing && isActiveRoom()) { const actions = el('div','file-actions'),inlineMedia = window.OchatChatMedia?.storesInline(event.offer),accept = el('button','primary',inlineMedia ? 'Download' : 'Save file…'),reject = el('button','secondary','Decline'); if (inlineMedia) accept.dataset.inlineMedia = 'true'; accept.onclick = () => action(accept,async () => { reject.disabled = true; try { if (await acceptFile(event,accept)) { actions.remove(); liveOffers.delete(`${event.peer}:${event.offer.id}`); } } finally { reject.disabled = false; } }); reject.onclick = () => action(reject,async () => { await invoke('cancel_transfer',{room:event.room,peer:event.peer,id:event.offer.id});await invoke('reject_file',{peer:event.peer,id:event.offer.id}); liveOffers.delete(`${event.peer}:${event.offer.id}`); actions.remove(); status.textContent = 'File declined'; }); const restart=toolButton('Restart download…',async()=>{await invoke('cancel_transfer',{room:event.room,peer:event.peer,id:event.offer.id});if(await invoke('receive_file',{peer:event.peer,id:event.offer.id})){actions.remove();liveOffers.delete(`${event.peer}:${event.offer.id}`);}},'secondary restart-download');restart.hidden=true;actions.append(accept,restart,reject);card.append(actions); }
-  body.append(card); appendEntry(row);
+  const voiceMessage=event.offer.name==='Voice message.wav';
+  if(voiceMessage){event={...event,type:'file_offered',id:event.offer.id,channel:eventChannel(event),timestamp:event.timestamp||Date.now(),text:'',emojis:[],mentions:[]};if(event.deleted)return addMessage(event,live);}
+  const {row,body} = messageFrame(event),card = el('div','file-card'); row.dataset.fileId=event.offer.id;card.dataset.fileId = event.offer.id; card.dataset.peer = event.peer; card.dataset.outgoing = String(event.outgoing); if(event.offer.name==='Voice message.wav')card.classList.add('voice-message-card'); card.append(el('strong','',event.offer.name==='Voice message.wav'?'Voice message':event.offer.name),el('small','',`${size(event.offer.size)} · BLAKE3 verified on receipt`)); const status = el('div','file-progress',event.outgoing ? 'Offered to participants' : live ? 'Waiting for your approval' : 'Saved file offer · download may no longer be available'); card.append(status,el('div','file-recipients')); window.OchatChatMedia?.attach(card,{room:event.room||selectedRoom,peer:event.peer,id:event.offer.id,name:event.offer.name,size:event.offer.size});
+  if (!event.outgoing && isActiveRoom()) { const actions = el('div','file-actions'),inlineMedia = window.OchatChatMedia?.storesInline(event.offer),accept = el('button','primary',inlineMedia ? (event.offer.name==='Voice message.wav'?'Load voice message':'Download') : 'Save file…'),reject = el('button','secondary','Decline'); if (inlineMedia) accept.dataset.inlineMedia = 'true'; accept.onclick = () => action(accept,async () => { reject.disabled = true; try { if (await acceptFile(event,accept)) { actions.remove(); liveOffers.delete(`${event.peer}:${event.offer.id}`); } } finally { reject.disabled = false; } }); reject.onclick = () => action(reject,async () => { await invoke('cancel_transfer',{room:event.room,peer:event.peer,id:event.offer.id});await invoke('reject_file',{peer:event.peer,id:event.offer.id}); liveOffers.delete(`${event.peer}:${event.offer.id}`); actions.remove(); status.textContent = 'File declined'; }); const restart=toolButton('Restart download…',async()=>{await invoke('cancel_transfer',{room:event.room,peer:event.peer,id:event.offer.id});if(await invoke('receive_file',{peer:event.peer,id:event.offer.id})){actions.remove();liveOffers.delete(`${event.peer}:${event.offer.id}`);}},'secondary restart-download');restart.hidden=true;actions.append(accept,restart,reject);card.append(actions); }
+  if(voiceMessage){const bubble=el('div','bubble voice-note-bubble');bubble.append(card);body.append(bubble);row.dataset.messageId=event.id;row.dataset.peer=event.peer;messageCache.set(messageKey(event.room||selectedRoom,event),event);enhanceMessage(row,event);}else body.append(card);
+  appendEntry(row);
 }
 function filePeerStatus(card,peer,name,status) {
   const list = card.querySelector('.file-recipients'); let row = [...list.children].find(row => row.dataset.peer === peer);
@@ -1033,7 +1060,7 @@ $('auth-dialog').addEventListener('cancel',event => event.preventDefault());
 $('create-account-form').onsubmit = event => { event.preventDefault(); formAction(event.currentTarget,async () => { matchesPassword('create-password','create-password-confirm'); const generation = sessionGeneration; await completeAccount(await invoke('create_account',{name:$('account-name').value.trim(),password:$('create-password').value}), generation); }); };
 $('unlock-form').onsubmit = event => { event.preventDefault(); formAction(event.currentTarget,async () => { const generation = sessionGeneration; await completeAccount(await invoke('unlock_account',{password:$('unlock-password').value}), generation); }); };
 $('auth-import').onclick = () => { clearPasswords(); setAuthMode('import'); };
-$('auth-back').onclick = () => { $('import-key').value = ''; clearPasswords(); setAuthMode(accountExists ? 'unlock' : 'create'); };
+$('auth-back').onclick = () => { if(window.OchatAccountRecovery?.back())return; $('import-key').value = ''; clearPasswords(); setAuthMode(accountExists ? 'unlock' : 'create'); };
 $('choose-backup').onclick = () => action($('choose-backup'),async () => { const name = await invoke('choose_backup'); if (name) $('backup-file-name').textContent = name; });
 $('import-form').onsubmit = event => { event.preventDefault(); formAction(event.currentTarget,async () => { matchesPassword('import-password','import-password-confirm'); if (accountExists && !$('replace-account').checked) throw new Error('Confirm replacement of the existing local account.'); await invoke('import_backup',{recoveryKey:$('import-key').value.trim(),password:$('import-password').value,replace:$('replace-account').checked}); $('import-key').value = ''; clearPasswords(); accountExists = true; setAuthMode('unlock'); toast('Backup verified and imported. Unlock with your new local password.'); }); };
 $('recovery-confirm').onchange = () => { $('recovery-done').disabled = !$('recovery-confirm').checked; };
@@ -1048,7 +1075,7 @@ $('invite-button').onclick = () => action($('invite-button'),async () => { $('in
 $('copy-invite').onclick = () => action($('copy-invite'),async () => { await invoke('copy_text',{text:$('invitation-output').value}); toast('Invitation copied. Share it only with people you trust.'); });
 $('leave-button').onclick = () => confirm('Leave this room?','Saved messages and emojis stay encrypted on this device. An active call will end.','Leave room',async () => { stopTyping(); await invoke('leave_room'); state = await invoke('snapshot'); render(); });
 $('reconnect-button').onclick = () => action($('reconnect-button'),async () => { const id = selectedRoom; await invoke('reopen_room',{id}); state = await invoke('snapshot'); selectedRoom = id; render(); });
-$('clear-history').onclick = () => { const room = selectedRoom; confirm('Delete this room’s history?','This removes saved messages from this device. Other participants keep their own copies.','Delete history',async () => { historyGeneration++;await invoke('delete_history',{room});replyDrafts.delete(room);for(const key of messageCache.keys())if(key.startsWith(room+':'))messageCache.delete(key);await loadRoom(room); }); };
+$('clear-history').onclick = () => { const room = selectedRoom; confirm('Delete this room’s history?','This removes saved messages from this device. Other participants keep their own copies.','Delete history',async () => { historyGeneration++;await invoke('delete_history',{room});window.OchatFriendRecency?.clear(room);replyDrafts.delete(room);for(const key of messageCache.keys())if(key.startsWith(room+':'))messageCache.delete(key);await loadRoom(room); }); };
 $('delete-room').onclick = () => { const room = selectedRoom; confirm('Delete this room for everyone?','The room and its history will be removed from each Ochat app when it reconnects to a participant who knows about the deletion. Downloaded files and exported copies are not removed. This cannot be undone.','Delete room',async () => { await invoke('delete_room',{room}); }); };
 $('forget-room').onclick=()=>requestForgetRoom(selectedRoom);
 $('composer').onsubmit = event => { event.preventDefault(); if (!$('message').value.trim()) return; if (!selectedRoom) { toast('Choose a conversation first. Your draft is kept.'); return; } action($('send-button'),async () => { const text = $('message').value,room=selectedRoom,channel=selectedChannel(),scope=draftKey(); const reply=replyDrafts.get(scope);const chosen=[...(chosenDraftEmojis.get(scope)?.values() || [])].filter(e=>text.includes(`:${e.name}:`));await invoke('send_text',{room,channel,text,emojis:chosen,mentions:mentionsForDraft(text),replyTo:reply?{id:reply.id,peer:reply.peer}:null});if(replyDrafts.get(scope)===reply)replyDrafts.delete(scope);renderReply(); if (draftKey()===scope && $('message').value === text) $('message').value = ''; drafts.set(scope,'');chosenDraftEmojis.delete(scope);selectedMentions.delete(scope);closeMentions(); $('message').style.height = 'auto'; stopTyping(); $('message').focus(); }); };
@@ -1221,6 +1248,7 @@ async function handleEvent(event) {
   if (event.type === 'room_deleted' || removedLocally) deletedRooms.add(event.room);
   if (!unlocked) return;
   if (event.type === 'room_deleted' || removedLocally) {
+    window.OchatFriendRecency?.clear(event.room);
     for(const [key,update] of toolUpdates)if(update.room===event.room)toolUpdates.delete(key);for(const key of deliveryStates.keys())if(key.startsWith(event.room+':'))deliveryStates.delete(key);if(collectionRoom===event.room){collectionEntries=[];$('collection-results').replaceChildren();$('collection-dialog').close();}activityEntries=activityEntries.filter(e=>e.room!==event.room);renderActivity();
     const wasSelected=selectedRoom===event.room;introducedProfiles.delete(event.room);attentionRooms.delete(event.room);endTabDrag();conversationLayout=normalizeLayout(conversationLayout);savedLayout=normalizeLayout(savedLayout);
     if(settings?.room_notifications)delete settings.room_notifications[event.room];
@@ -1234,6 +1262,7 @@ async function handleEvent(event) {
     if(removedLocally){$(`conversation-tab-${selectedRoom}`)?.focus({preventScroll:true});toast('Conversation and history deleted from this device.');}else toast('Room and history deleted by the owner.'); return;
   }
   if ((event.room && deletedRooms.has(event.room)) || (event.snapshot?.room && deletedRooms.has(event.snapshot.room.id))) return;
+  window.OchatFriendRecency?.onEvent(event);
   if(event.type==='channels_changed'){
     const affected=event.room===selectedRoom && event.deleted===selectedChannel();
     if(event.deleted){if(notificationRoom===event.deleted){$('room-notifications-dialog').close();notificationRoom=null;}const scope=draftKey(event.room,event.deleted);for(const map of [drafts,replyDrafts,chosenDraftEmojis,selectedMentions,readMarkers])map.delete(scope);for(const [key,message]of messageCache)if(message.room===event.room && eventChannel(message)===event.deleted)messageCache.delete(key);if(toolMessage && eventChannel(toolMessage)===event.deleted)clearMessageTools();}
@@ -1243,7 +1272,7 @@ async function handleEvent(event) {
   if (event.type === 'room_state') { const snapshot = event.snapshot; if (!snapshot.room) return; roomSnapshots.set(snapshot.room.id,snapshot); roomMembers.set(snapshot.room.id,snapshot.members || snapshot.peers);render(); if (snapshot.call?.status === 'incoming' && selectedRoom !== snapshot.room.id) await selectRoom(snapshot.room.id); }
   else if (event.type === 'room_disconnected') { const previous = roomSnapshots.get(event.room); if (previous) roomMembers.set(event.room,(previous.members || previous.peers).map(p => ({...p,online:false,voice:false,typing:false}))); roomSnapshots.delete(event.room); roomsKey = ''; render(); }
   else if (event.type === 'state') { const previous = state?.room?.id; state = event.snapshot; if (state.room) { roomSnapshots.set(state.room.id,state); roomMembers.set(state.room.id,state.members || state.peers); } if (state.room?.id && state.room.id !== previous) { historyLoading=true; drafts.set(draftKey(),$('message').value); selectedRoom = state.room.id;  if (!drafts.has(draftKey())) drafts.set(draftKey(),$('message').value); $('message').value = drafts.get(draftKey()) || ''; await refreshRooms(); await loadRoom(selectedRoom); } render(); }
-  else if (event.type === 'message') { window.OchatChannels?.message(event);refreshActivity().catch(()=>{});if(!rememberMessage(event))return;const added=inSelectedChannel(event)?addMessage(event,true):true; if (added && event.peer !== state.id && isUnread(event)) { unread.set(event.room,Math.min(999,(unread.get(event.room) || 0)+1));if(!conversationIsOpen(event.room))attentionRooms.add(event.room);roomsKey = ''; renderRooms(); } }
+  else if (event.type === 'message') { window.OchatChannels?.message(event);refreshActivity().catch(()=>{});if(!rememberMessage(event))return;promotePrivateConversation(event.room);const added=inSelectedChannel(event)?addMessage(event,true):true; if (added && event.peer !== state.id && isUnread(event)) { unread.set(event.room,Math.min(999,(unread.get(event.room) || 0)+1));if(!conversationIsOpen(event.room))attentionRooms.add(event.room);roomsKey = ''; renderRooms(); } }
   else if (event.type === 'member_joined') { if (inSelectedChannel(event)) addJoinNotice(event); }
   else if (event.type === 'file_offered') { if (!event.outgoing) liveOffers.set(`${event.peer}:${event.offer.id}`,event); if (inSelectedChannel(event) && isActiveRoom()) addFile(event,true); }
   else if (event.type === 'transfer') { if (inSelectedChannel(event)) transfer(event); }
@@ -1280,7 +1309,7 @@ function enhanceMessage(row,event){
   const reply=body.querySelector('.reply-action');if(reply){reply.classList.add('message-reply');}
   const toolbar=el('div','message-toolbar');if(reply)toolbar.append(reply);
   const react=toolButton('React',()=>openReactions(event));react.setAttribute('aria-label',`React to message from ${event.name}`);
-  const more=toolButton('•••',()=>openMessageTools(event,{anchor:more}));more.setAttribute('aria-label',`More actions for message from ${event.name}`);toolbar.append(react,toolButton('Thread',()=>window.OchatWorkspace?.openThread(event)),more);body.append(toolbar,el('div','message-reactions'));
+  const more=toolButton('•••',()=>openMessageTools(event,{anchor:more}));more.setAttribute('aria-label',`More actions for message from ${event.name}`);if(event.type!=='file_offered')toolbar.append(react,toolButton('Thread',()=>window.OchatWorkspace?.openThread(event)));toolbar.append(more);body.append(toolbar,el('div','message-reactions'));
   const status=el('div','message-delivery');status.setAttribute('aria-live','polite');body.append(status);
   row._toolEvent=event;if(projected.deleted || projected.edited){const bubble=body.querySelector('.bubble');bubble.replaceChildren();appendTextWithEmojis(bubble,projected.deleted?'Message deleted':projected.text,projected.emojis || [],[]);if(projected.deleted){body.querySelectorAll('.link-preview,.reply-quote').forEach(n=>n.remove());}}renderMessageMetadata(row);
 }
@@ -1300,6 +1329,7 @@ async function changeMessage(event,change){const room=event.room || selectedRoom
 function applyMessageUpdate(update){
   const row=messageRow(update.message);if(update.room!==selectedRoom || !row)return;
   if(update.change.kind==='edit'){
+    if(update.change.text===null)for(const card of row.querySelectorAll('.file-card'))window.OchatChatMedia?.remove(card);
     const event=projectedEvent(row._toolEvent),body=row.querySelector('.message-body'),bubble=body.querySelector('.bubble');bubble.replaceChildren();if(event.deleted || !window.OchatPersonalization?.image(bubble,event))appendTextWithEmojis(bubble,event.deleted?'Message deleted':event.text,event.deleted?[]:event.emojis,[]);
     body.querySelectorAll('.link-preview,.link-card,.link-preview-card,.link-preview-placeholder,.message-links').forEach(n=>n.remove());
     // Preview implementations may wrap cards; remove every preview resource in this message.
@@ -1351,14 +1381,18 @@ function openMessageTools(event,{point,anchor}={}){
   $('message-tools-context').textContent=`${event.name} · ${(window.OchatProductivity?.date(event.timestamp || Date.now()) || messageDate.format(new Date(event.timestamp || Date.now())))}${roomSnapshots.get(event.room)?.peers.some(p=>p.message_tools===false)?' · Some participants need Ochat 0.5 to see message changes.':''}`;
   const list=$('message-tools-actions');list.replaceChildren();
   const add=(label,callback,danger=false)=>{const b=toolButton(label,async()=>{if(!unlocked || generation!==sessionGeneration || room!==selectedRoom || scope!==draftKey())return;closeMessageMenu(false);await callback();},'message-menu-item'+(danger?' danger':''));b.setAttribute('role','menuitem');list.append(b);return b;};
+  const voiceMessage=event.type==='file_offered';
+  if(voiceMessage)add('Audio options',()=>{const options=messageRow(event)?.querySelector('.voice-options');if(options){options.open=true;options.querySelector('summary')?.focus();}});
+  if(!voiceMessage){
   add('Reply',()=>beginReply(event));
   add('Add reaction…',()=>openReactions(event));
   add('Open thread',()=>window.OchatWorkspace?.openThread(event));
   add('Copy text',async()=>{await invoke('copy_text',{text:projectedEvent(event).text});toast('Message copied.');});
   const pinned=updatesFor(event).some(u=>u.change.kind==='pin'&&u.change.active);
   const pinButton=add(pinned?'Unpin message':'Pin message',()=>changeMessage(event,{kind:'pin',active:!pinned}));pinButton.disabled=snapshotFor(event.room)?.permissions?.pins===false;pinButton.title=pinButton.disabled?'Your role cannot pin messages':'';
+  }
   if(event.peer===state.id){
-    add('Edit message',()=>{toolMessage=event;$('edit-message-text').value=projectedEvent(event).text;$('edit-message-form').querySelector('.form-error').textContent='';show('edit-message-dialog');$('edit-message-text').focus();});
+    if(!voiceMessage)add('Edit message',()=>{toolMessage=event;$('edit-message-text').value=projectedEvent(event).text;$('edit-message-form').querySelector('.form-error').textContent='';show('edit-message-dialog');$('edit-message-text').focus();});
     add('Delete message…',()=>confirm('Delete this message?','Remove its content from this conversation. Deletion synchronizes when participants reconnect. Recipients may have kept copies or backups.','Delete message',()=>changeMessage(event,{kind:'edit',text:null,emojis:[]})),true);
   }
   menu.show();placeMessageMenu(point,messageMenuAnchor);list.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
@@ -1495,3 +1529,15 @@ window.OchatPhotoCrop?.init({invoke,toast,context:()=>({unlocked,generation:sess
 window.OchatUpdates?.init({invoke,toast,openExternalLink,context:()=>({unlocked,generation:sessionGeneration,settings})});
 
 window.OchatDiscordWebhook?.init({invoke,context:()=>({unlocked,generation:sessionGeneration})});
+window.OchatFriendRecency?.init({invoke,promote:promotePrivateConversation,context:()=>({unlocked,friends})});
+
+window.OchatVoiceMessages?.init({
+  invoke, error: error => toast(String(error?.message || error)),
+  context: () => ({unlocked, room:selectedRoom, channel:selectedChannel(), connected:!!selectedRoom && isActiveRoom() && (state?.room?.capacity===2 || !!selectedChannel()), voice:[...roomSnapshots.values()].some(s => s.voice || s.call)})
+});
+
+window.OchatAccountRecovery?.init({
+  invoke, mode:setAuthMode, clearPasswords, toast,
+  context:()=>({unlocked,generation:sessionGeneration,exists:accountExists}),
+  accountRemoved:()=>{accountExists=false;}
+});

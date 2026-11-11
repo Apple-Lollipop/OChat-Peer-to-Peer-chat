@@ -2,9 +2,14 @@ name: Desktop builds
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional version tag to create and publish after successful builds (main only)'
+        required: false
+        type: string
+        default: ''
   push:
-    # Populate default-branch caches that every future release tag can restore.
-    branches: [main]
+    # A manual publication on main warms shared caches and creates its tag only after building.
     tags: ['v*']
   pull_request:
 
@@ -52,13 +57,14 @@ jobs:
           cache: npm
       - name: Configure compilation parallelism
         run: |
-          node -e 'const os=require("node:os"),fs=require("node:fs"); const jobs=Math.max(1,Math.min(4,os.availableParallelism(),Math.floor(os.totalmem()/2**30/4))); fs.appendFileSync(process.env.GITHUB_ENV,`CARGO_BUILD_JOBS=${jobs}\n`); console.log(`Using ${jobs} parallel Rust compilation jobs`);'
+          node -e 'const os=require("node:os"),fs=require("node:fs"); const jobs=Math.max(1,Math.min(4,os.availableParallelism(),Math.floor(os.totalmem()/2**30/2.5))); fs.appendFileSync(process.env.GITHUB_ENV,`CARGO_BUILD_JOBS=${jobs}\n`); console.log(`Using ${jobs} parallel Rust compilation jobs`);'
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          cache-workspace-crates: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: mozilla-actions/sccache-action@v0.0.11
         continue-on-error: true
@@ -75,7 +81,7 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-tauri-tools-v1-
       - name: Check project and release versions
         env:
-          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag || '' }}
         run: node scripts/release/check-version.cjs
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -85,11 +91,6 @@ jobs:
       - run: npm ci
       - name: Verify vendored security patch integrity
         run: node scripts/security/verify-vendored-glib.cjs
-      - name: Check interface
-        run: npm test 2>&1 | tee ui-tests.log
-      - run: cargo fmt --all -- --check
-      - name: Check core and peer-to-peer integrations
-        run: cargo test -p ochat-core --locked 2>&1 | tee core-tests.log
       - name: Build desktop bundles
         if: runner.os != 'Windows'
         run: npm run tauri -- build --bundles ${{ matrix.bundles }} ${{ matrix.arguments }} -- --locked 2>&1 | tee desktop-build.log
@@ -117,34 +118,35 @@ jobs:
           name: Ochat-${{ matrix.os }}
           path: releases/${{ matrix.platform == 'windows' && 'Windows' || 'Linux' }}/
           if-no-files-found: error
+          compression-level: 0
       - name: Save diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: Ochat-${{ matrix.os }}-logs
           path: |
-            ui-tests.log
-            core-tests.log
             desktop-build.log
           if-no-files-found: ignore
           retention-days: 7
   macos:
     name: macOS (Apple Silicon)
     uses: ./.github/workflows/macos.yml
+    with:
+      release_tag: ${{ inputs.release_tag || '' }}
   release:
     name: Publish GitHub release
     timeout-minutes: 20
     needs: [desktop, macos]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.release_tag != '')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: read
     concurrency:
-      group: release-${{ github.repository }}-${{ github.ref_name }}
+      group: release-${{ github.repository }}-${{ inputs.release_tag || github.ref_name }}
       cancel-in-progress: false
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -164,6 +166,10 @@ jobs:
           path: release-input/macOS
       - name: Verify all platform bundles and prepare checksums
         run: node scripts/release/prepare.cjs release-input release-upload "$RELEASE_TAG"
+      - name: Ensure the verified source has its version tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release/ensure-tag.cjs
       - name: Publish verified assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

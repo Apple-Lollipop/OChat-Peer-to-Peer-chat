@@ -99,3 +99,5 @@
   #navigation-friends :is(#received-friend-list,#sent-friend-list) .friend-row{grid-template-columns:minmax(0,1fr)}
   #navigation-friends :is(#received-friend-list,#sent-friend-list) .friend-controls{margin-left:56px}
 }
+
+#navigation-friends .friend-conversation-row{cursor:pointer}

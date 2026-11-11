@@ -16,13 +16,81 @@ test('macOS capture denial identifies the relevant privacy setting without retry
  }
  assert.equal(captures,2);assert.equal(a.calls.some(([command])=>command==='start_visual'),false);
 });
-const source = fs.readFileSync('ui/vendor/twemoji/twemoji.min.js','utf8')+'\n'+fs.readFileSync('ui/emoji-renderer.js','utf8')+'\n'+fs.readFileSync('ui/profiles.js','utf8')+'\n'+fs.readFileSync('ui/community.js','utf8')+'\n'+fs.readFileSync('ui/discord.js','utf8')+'\n'+fs.readFileSync('ui/presentation.js','utf8')+'\n'+fs.readFileSync('ui/video-renderer.js','utf8')+'\n'+fs.readFileSync('ui/media.js','utf8')+'\n'+fs.readFileSync('ui/features.js','utf8')+'\n'+fs.readFileSync('ui/meme-picker.js','utf8')+'\n'+fs.readFileSync('ui/personalization.js','utf8')+'\n'+fs.readFileSync('ui/passwords.js','utf8')+'\n'+fs.readFileSync('ui/timeline-scroll.js','utf8')+'\n'+fs.readFileSync('ui/photo-crop.js','utf8')+'\n'+fs.readFileSync('ui/emoji-popover.js','utf8')+'\n'+fs.readFileSync('ui/rich-text.js','utf8')+'\n'+fs.readFileSync('ui/message-media.js','utf8')+'\n'+fs.readFileSync('ui/app.js','utf8')+'\n'+fs.readFileSync('ui/organization.js','utf8')+'\n'+fs.readFileSync('ui/presence.js','utf8')+'\n'+fs.readFileSync('ui/account-menu.js','utf8')+'\n'+fs.readFileSync('ui/workspace.js','utf8')+'\n'+fs.readFileSync('ui/native-controls.js','utf8')+'\n'+fs.readFileSync('ui/conversation-create.js','utf8');
+const source = fs.readFileSync('ui/friend-recency.js','utf8')+'\n'+fs.readFileSync('ui/audio-waveform.js','utf8')+'\n'+fs.readFileSync('ui/chat-media.js','utf8')+'\n'+fs.readFileSync('ui/vendor/twemoji/twemoji.min.js','utf8')+'\n'+fs.readFileSync('ui/emoji-renderer.js','utf8')+'\n'+fs.readFileSync('ui/profiles.js','utf8')+'\n'+fs.readFileSync('ui/community.js','utf8')+'\n'+fs.readFileSync('ui/discord.js','utf8')+'\n'+fs.readFileSync('ui/presentation.js','utf8')+'\n'+fs.readFileSync('ui/video-renderer.js','utf8')+'\n'+fs.readFileSync('ui/media.js','utf8')+'\n'+fs.readFileSync('ui/features.js','utf8')+'\n'+fs.readFileSync('ui/meme-picker.js','utf8')+'\n'+fs.readFileSync('ui/personalization.js','utf8')+'\n'+fs.readFileSync('ui/passwords.js','utf8')+'\n'+fs.readFileSync('ui/timeline-scroll.js','utf8')+'\n'+fs.readFileSync('ui/photo-crop.js','utf8')+'\n'+fs.readFileSync('ui/emoji-popover.js','utf8')+'\n'+fs.readFileSync('ui/rich-text.js','utf8')+'\n'+fs.readFileSync('ui/message-media.js','utf8')+'\n'+fs.readFileSync('ui/app.js','utf8')+'\n'+fs.readFileSync('ui/organization.js','utf8')+'\n'+fs.readFileSync('ui/presence.js','utf8')+'\n'+fs.readFileSync('ui/account-menu.js','utf8')+'\n'+fs.readFileSync('ui/workspace.js','utf8')+'\n'+fs.readFileSync('ui/native-controls.js','utf8')+'\n'+fs.readFileSync('ui/conversation-create.js','utf8');
 const html = fs.readFileSync('ui/index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const settings = {theme:'system',audio:{input_device:null,output_device:null,input_volume:1,output_volume:1,noise_suppression:true,echo_cancellation:true,automatic_gain:true},message_sound:true,ringtone:true,sound_volume:0.35,relay_enabled:false};
 const base = {id:'self',name:'Test',room:null,peers:[],voice:false,muted:false,relay_enabled:false,call:null};
 const connected = {...base,room:{id:'room',name:'Room',capacity:2},peers:[{id:'peer',name:'Peer',voice:false,route:'direct',typing:false}]};
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const channelRoom = { ...connected,room:{id:'room',name:'Studio',capacity:0,owner:'self'},text_channel:'general',voice_channel:null,channels:[{id:'general',room:'room',kind:'text',name:'general',order:0},{id:'projects',room:'room',kind:'text',name:'projects',order:1},{id:'voice-general',room:'room',kind:'voice',name:'General',order:0},{id:'voice-lounge',room:'room',kind:'voice',name:'Lounge',order:1}] };
+
+test('Friends prioritizes saved and live direct activity without replacing focused rows or promoting groups',async t=>{
+ const a=await setup(t);a.session(connected);const original=a.window.__TAURI__.core.invoke;
+ const friends=[{peer:'alpha',name:'Alpha',status:'accepted',direct_room:'dm-alpha',presence_online:true,last_message_at:20},{peer:'beta',name:'Beta',status:'accepted',direct_room:'dm-beta',last_message_at:50}];
+ a.window.__TAURI__.core.invoke=async(c,args)=>c==='list_friends'?friends:original(c,args);
+ await a.app.handleEvent({type:'friends_changed'});const list=a.get('accepted-friend-list'),order=()=>[...list.querySelectorAll('.friend-row')].map(row=>row.dataset.peer);
+ assert.deepEqual(order(),['beta','alpha']);const row=list.querySelector('[data-peer="alpha"]'),button=row.querySelector('button');button.focus();
+ await a.app.handleEvent({type:'message',room:'dm-alpha',peer:'self',name:'Test',id:'recent-own-message',text:'Sent',timestamp:80,emojis:[]});
+ assert.deepEqual(order(),['alpha','beta']);assert.equal(list.querySelector('[data-peer="alpha"]'),row);assert.equal(a.window.document.activeElement,button);
+ await a.app.handleEvent({type:'message',room:'unrelated-group',peer:'beta',name:'Beta',id:'group-message',text:'Group',timestamp:100,emojis:[]});assert.deepEqual(order(),['alpha','beta']);
+ await a.app.handleEvent({type:'message',room:'dm-beta',peer:'beta',name:'Beta',id:'recent-incoming-message',text:'Received',timestamp:120,emojis:[]});assert.deepEqual(order(),['beta','alpha']);
+});
+
+test('accepted friend rows open the chat while View profile and pending requests retain their separate actions',async t=>{
+ const a=await setup(t);a.session(connected);const original=a.window.__TAURI__.core.invoke;
+ const friends=[{peer:'peer',name:'Peer',status:'accepted',direct_room:'room',last_message_at:100},{peer:'request-peer',name:'Request',status:'incoming'}];
+ a.window.__TAURI__.core.invoke=async(command,args)=>{if(command==='open_direct'){a.calls.push([command,args]);return 'room';}return command==='list_friends'?friends:command==='list_rooms'?[connected.room]:original(command,args);};
+ await a.app.handleEvent({type:'friends_changed'});const row=()=>a.get('accepted-friend-list').querySelector('.friend-row');
+ row().querySelector('.friend-heading').click();await flush();await flush();await flush();
+ assert.equal(a.calls.filter(([command])=>command==='open_direct').length,1);assert.equal(a.get('floating-profile').open,false);
+ row().dispatchEvent(new a.window.MouseEvent('click',{bubbles:true}));await flush();await flush();await flush();
+ assert.equal(a.calls.filter(([command])=>command==='open_direct').length,2);
+ row().querySelector('.friend-profile-action').click();assert.equal(a.get('floating-profile').open,true);assert.equal(a.calls.filter(([command])=>command==='open_direct').length,2);
+ a.get('floating-profile').close();row().querySelector('.friend-more summary').click();assert.equal(a.calls.filter(([command])=>command==='open_direct').length,2);
+ a.get('received-friend-list').querySelector('.friend-heading').click();assert.equal(a.get('floating-profile').open,true);assert.equal(a.calls.filter(([command])=>command==='open_direct').length,2);
+});
+
+test('Private sidebar promotes incoming and sent chats, preserves pins and focus, and saves the resulting order',async t=>{
+ const a=await setup(t);a.session({...connected,voice:true});a.input('Keep this draft');
+ const direct=id=>({id,name:id,capacity:2}),group={id:'group-sidebar',name:'Group',capacity:0};
+ a.app.archive([direct('room'),direct('alpha'),direct('beta'),group]);
+ await a.app.saveLayout({order:['room','alpha','beta','group-sidebar'],pinned:['room']});
+ const list=a.get('private-conversation-tabs'),order=()=>[...list.children].map(node=>node.dataset.key);
+ const alpha=list.querySelector('[data-key="alpha"]'),focus=list.querySelector('[data-key="beta"] [role=tab]');focus.focus();
+ await a.app.handleEvent({type:'message',room:'beta',peer:'beta-peer',name:'Beta',id:'private-recent-beta',text:'New incoming',timestamp:120,emojis:[]});await flush();
+ assert.deepEqual(order(),['room','beta','alpha']);assert.equal(list.querySelector('[data-key="alpha"]'),alpha);assert.equal(a.window.document.activeElement,focus);
+ assert.equal(a.get('message').value,'Keep this draft');assert.equal(a.get('room-title').textContent,'Peer');assert.equal(a.get('voice-bar').hidden,false);
+ const saved=a.calls.filter(([command])=>command==='save_conversation_layout').at(-1)[1].layout;
+ assert.deepEqual(Array.from(saved.order),['room','beta','alpha','group-sidebar']);assert.deepEqual(Array.from(saved.pinned),['room']);
+ await a.app.handleEvent({type:'message',room:'alpha',peer:'self',name:'Test',id:'private-recent-own',text:'Sent',timestamp:130,emojis:[]});await flush();
+ assert.deepEqual(order(),['room','alpha','beta']);
+ const saves=a.calls.filter(([command])=>command==='save_conversation_layout').length;
+ await a.app.handleEvent({type:'message',room:'group-sidebar',peer:'self',name:'Test',id:'private-unrelated',text:'Group',timestamp:150,emojis:[]});
+ await a.app.handleEvent({type:'message',room:'beta',peer:'beta-peer',name:'Beta',id:'private-recent-beta',text:'Duplicate',timestamp:120,emojis:[]});await flush();
+ assert.deepEqual(order(),['room','alpha','beta']);assert.equal(a.calls.filter(([command])=>command==='save_conversation_layout').length,saves);
+ // A deliberate manual order remains visible until the next new exchange.
+ await a.app.saveLayout({order:['room','beta','alpha','group-sidebar'],pinned:['room']});assert.deepEqual(order(),['room','beta','alpha']);
+ await a.app.handleEvent({type:'message',room:'alpha',peer:'alpha-peer',name:'Alpha',id:'private-next-alpha',text:'Next',timestamp:160,emojis:[]});await flush();assert.deepEqual(order(),['room','alpha','beta']);
+});
+
+test('own voice messages expose signed deletion from right-click and stop/revoke playback on removal',async t=>{
+ const a=await setup(t);a.session(connected);const original=a.window.__TAURI__.core.invoke,revoked=[];
+ a.window.URL.createObjectURL=()=> 'blob:voice-deletion';a.window.URL.revokeObjectURL=url=>revoked.push(url);
+ a.window.HTMLMediaElement.prototype.load=function(){};
+ a.window.HTMLMediaElement.prototype.pause=function(){this.__paused=true;this.dispatchEvent(new a.window.Event('pause'));};
+ a.window.HTMLMediaElement.prototype.play=async function(){this.__paused=false;this.dispatchEvent(new a.window.Event('play'));};
+ Object.defineProperty(a.window.HTMLMediaElement.prototype,'paused',{configurable:true,get(){return this.__paused!==false;}});
+ a.window.__TAURI__.core.invoke=async(c,args)=>c==='chat_media_info'?{size:6,mime:'audio/wav',too_large:false}:c==='chat_media_chunk'?[1,2,3,4,5,6]:original(c,args);
+ const event={type:'file_offered',room:'room',peer:'self',name:'Test',outgoing:true,offer:{id:'voice-to-delete',name:'Voice message.wav',size:96044,hash:'a'.repeat(64)}};
+ await a.app.handleEvent(event);await flush();const row=a.get('timeline').querySelector('[data-message-id="voice-to-delete"]'),card=row.querySelector('.file-card');assert.ok(row);
+ card.querySelector('.voice-play').click();for(let i=0;i<5;i++)await flush();const audio=card.querySelector('audio');assert.equal(audio.paused,false);
+ card.querySelector('.audio-waveform-seek').dispatchEvent(new a.window.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:100,clientY:100}));
+ const labels=[...a.get('message-tools-actions').querySelectorAll('button')].map(button=>button.textContent);assert.ok(labels.includes('Delete message…'));assert.ok(!labels.includes('Edit message'));
+ [...a.get('message-tools-actions').querySelectorAll('button')].find(button=>button.textContent==='Delete message…').click();a.get('confirm-action').click();await flush();
+ assert.ok(a.calls.some(([c,args])=>c==='update_message'&&args.message.id==='voice-to-delete'&&args.message.peer==='self'&&args.change.text===null));
+ await a.app.handleEvent({type:'message_updated',room:'room',update:{room:'room',message:{peer:'self',id:'voice-to-delete'},actor:'self',revision:1,change:{kind:'edit',text:null,emojis:[]}}});
+ assert.equal(audio.paused,true);assert.deepEqual(revoked,['blob:voice-deletion']);assert.equal(row.querySelector('.file-card'),null);assert.match(row.querySelector('.bubble').textContent,/Message deleted/);
+});
 
 test('compact emoji picker stays open and preserves button positions for repeated insertion',async t=>{
  const a=await setup(t);a.session(connected);a.input('Hello ');a.get('message').setSelectionRange(6,6);a.get('emoji-button').click();await flush();
@@ -533,7 +601,7 @@ test('accepted friends show their photo and live presence without any room or se
  a.window.__TAURI__.core.invoke=async(command,args)=>command==='list_friends'?[friend]:command==='emoji_asset'?'data:image/png;base64,cGhvdG8=':previous(command,args);
  await a.app.handleEvent({type:'friends_changed'});await flush();
  const row=a.get('friend-list').querySelector('[data-peer="new-friend"]');assert.ok(row.querySelector('.presence-dot.online'));assert.ok(row.querySelector('.avatar img'));
- row.querySelector('.friend-heading').click();assert.equal(a.get('peer-presence').textContent,'Online');assert.equal(a.get('peer-bio').textContent,friend.bio);assert.equal(a.get('peer-connection').textContent,'Direct');
+ row.querySelector('.friend-profile-action').click();assert.equal(a.get('peer-presence').textContent,'Online');assert.equal(a.get('peer-bio').textContent,friend.bio);assert.equal(a.get('peer-connection').textContent,'Direct');
  assert.equal(a.calls.some(([command])=>['open_direct','send_text','create_room','join_room'].includes(command)),false);
  friend={...friend,presence_online:false,online:false,route:null,tor_enabled:null};await a.app.handleEvent({type:'friends_changed'});await flush();
  assert.ok(a.get('friend-list').querySelector('.presence-dot.offline'));assert.ok(a.get('friend-list').querySelector('.avatar img'));assert.equal(a.get('peer-presence').textContent,'Offline');

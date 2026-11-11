@@ -53,7 +53,7 @@
         });
       });
       document.getElementById('timeline')?.addEventListener('contextmenu', event => {
-        if (event.target.closest('a,input,textarea')) return;
+        if (event.target.closest('a,input,textarea') && !event.target.closest('.voice-note')) return;
         const row = event.target.closest('[data-message-id]');
         if (row && !row.classList.contains('deleted-message') && callbacks.canInteract()) { event.preventDefault(); callbacks.messageMenu(row,event); }
       });

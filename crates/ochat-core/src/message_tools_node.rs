@@ -4,6 +4,74 @@ use crate::message_tools::{Change, Delivery, Update, Verification};
 #[cfg(test)]
 mod sync_validation_tests {
     use super::*;
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn deleted_voice_offer_replay_cannot_restore_an_incoming_download() {
+        let alice = ChatNode::start("Alice", false).await.unwrap();
+        let bob = ChatNode::start("Bob", false).await.unwrap();
+        let invitation = alice.create_room("Replay", 4).await.unwrap();
+        let room = alice.snapshot().room.unwrap().id;
+        bob.join(&invitation).await.unwrap();
+        let offer = alice
+            .offer_voice_message(
+                alice.snapshot().text_channel,
+                crate::voice_message::encode_wav(&vec![0.2; 480]).unwrap(),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while bob.incoming_offer(&alice.id(), offer.id).is_err() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+        alice
+            .update_message(
+                room,
+                MessageRef {
+                    peer: alice.id(),
+                    id: offer.id,
+                },
+                Change::Edit {
+                    text: None,
+                    emojis: vec![],
+                },
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !bob.attachment_deleted(room, &alice.id(), offer.id).unwrap() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+        bob.handle_wire(
+            room,
+            &alice.id(),
+            Wire::File {
+                offer: offer.clone(),
+            },
+            &mut HashSet::new(),
+        )
+        .unwrap();
+        assert!(bob.incoming_offer(&alice.id(), offer.id).is_err());
+        assert!(
+            !bob.received
+                .lock()
+                .unwrap()
+                .contains_key(&(alice.id(), offer.id))
+        );
+        assert!(
+            bob.history(room)
+                .unwrap()
+                .iter()
+                .any(|entry| entry.event["offer"]["id"] == offer.id.to_string()
+                    && entry.event["deleted"] == true)
+        );
+        alice.close().await;
+        bob.close().await;
+    }
 
     #[test]
     fn archived_message_order_uses_send_time_not_receipt_time() {
@@ -103,7 +171,38 @@ pub(super) struct ToolState {
     pub deliveries: HashMap<String, Delivery>,
 }
 impl ChatNode {
-    fn tool_room_guard(
+    fn attachment_message(
+        &self,
+        room: Uuid,
+        reference: &MessageRef,
+    ) -> Result<Option<HistoryEntry>> {
+        reference.validate()?;
+        let key = format!("history/{room}/{}/{}", reference.peer, reference.id);
+        let mut entry = if let Some(vault) = &self.vault {
+            vault.get::<HistoryEntry>(&key)?
+        } else {
+            self.tools.lock().unwrap().messages.get(&key).cloned()
+        };
+        if let Some(entry) = entry.as_mut() {
+            self.project_message(entry)?;
+        }
+        Ok(entry.filter(|entry| {
+            entry.room == room
+                && entry.event["type"] == "file_offered"
+                && entry.event["peer"].as_str() == Some(reference.peer.as_str())
+                && entry.event["offer"]["id"].as_str() == Some(reference.id.to_string().as_str())
+        }))
+    }
+    pub(super) fn attachment_deleted(&self, room: Uuid, peer: &str, id: Uuid) -> Result<bool> {
+        let slot = format!("updates/{room}/{peer}/{id}/edit");
+        Ok(if let Some(vault) = &self.vault {
+            vault.get::<Update>(&slot)?
+        } else {
+            self.tools.lock().unwrap().updates.get(&slot).cloned()
+        }
+        .is_some_and(|update| update.deleted()))
+    }
+    pub(super) fn tool_room_guard(
         &self,
         room: Uuid,
     ) -> Result<std::sync::MutexGuard<'_, HashMap<Uuid, RoomDeletion>>> {
@@ -164,9 +263,17 @@ impl ChatNode {
         if self.channel_deleted(scope) {
             return Ok(false);
         }
-        if let Some(entry) = self.message(update.room, &update.message)? {
+        if let Some(entry) = self
+            .message(update.room, &update.message)?
+            .or(self.attachment_message(update.room, &update.message)?)
+        {
+            ensure!(
+                entry.event["type"] != "file_offered" || update.deleted(),
+                "Attachments can only be deleted"
+            );
             let stored = entry.event["channel"]
                 .as_str()
+                .or_else(|| entry.event["offer"]["channel"].as_str())
                 .and_then(|s| s.parse::<Uuid>().ok());
             let expected = stored.or_else(|| {
                 update.channel.map(|_| {
@@ -222,6 +329,32 @@ impl ChatNode {
                 entry.event["emojis"] = serde_json::to_value(emojis)?;
                 entry.event["mentions"] = serde_json::json!([]);
                 self.tool_put(&key, entry)?;
+                if text.is_none() && entry.event["type"] == "file_offered" {
+                    if self
+                        .room
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .is_some_and(|room| room.id == update.room)
+                    {
+                        if update.message.peer == self.id() {
+                            self.files.lock().unwrap().remove(&update.message.id);
+                        }
+                        self.received
+                            .lock()
+                            .unwrap()
+                            .remove(&(update.message.peer.clone(), update.message.id));
+                    }
+                    if let Some(vault) = &self.vault {
+                        super::file_snapshot::remove_message_media(
+                            vault,
+                            update.room,
+                            &update.message.peer,
+                            update.message.id,
+                            update.message.peer == self.id(),
+                        )?;
+                    }
+                }
                 if let (Some(hash), Some(vault)) = (old_image, &self.vault) {
                     vault.prune_inline_image(update.room, update.channel, &hash)?;
                 }
@@ -256,7 +389,11 @@ impl ChatNode {
             }
         }
         let peer = entry.event["peer"].as_str().unwrap_or("").to_owned();
-        let id = entry.event["id"].as_str().unwrap_or("").to_owned();
+        let id = entry.event["id"]
+            .as_str()
+            .or_else(|| entry.event["offer"]["id"].as_str())
+            .unwrap_or("")
+            .to_owned();
         for update in updates
             .iter()
             .filter(|u| u.message.peer == peer && u.message.id.to_string() == id)
@@ -299,6 +436,11 @@ impl ChatNode {
         ensure!(!self.is_forgotten(room), "Conversation has been removed");
         let entry = self
             .message(room, &message)?
+            .or(if matches!(&change, Change::Edit { text: None, .. }) {
+                self.attachment_message(room, &message)?
+            } else {
+                None
+            })
             .context("This message is no longer saved on this device")?;
         ensure!(entry.event["deleted"] != true, "This message was deleted");
         let change = if let Change::Edit {
@@ -331,6 +473,7 @@ impl ChatNode {
         };
         let channel = entry.event["channel"]
             .as_str()
+            .or_else(|| entry.event["offer"]["channel"].as_str())
             .and_then(|s| s.parse::<Uuid>().ok());
         let provisional = Update::create_in_channel(
             self.endpoint.secret_key(),
@@ -822,7 +965,7 @@ impl ChatNode {
             .history(room)?
             .into_iter()
             .filter(|e| {
-                e.event["type"] == "file_offered"
+                (e.event["type"] == "file_offered" && e.event["deleted"] != true)
                     || (e.event["type"] == "message"
                         && e.event["deleted"] != true
                         && e.event["text"].as_str().is_some_and(|t| {

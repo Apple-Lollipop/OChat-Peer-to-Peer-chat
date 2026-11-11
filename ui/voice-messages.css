@@ -1,0 +1,51 @@
+/* Voice notes share the same waveform language in the recorder and timeline. */
+.voice-message-panel { display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;margin:0 16px 8px;border:1px solid var(--line);border-radius:18px;background:var(--panel);color:var(--text); }
+.voice-message-panel[hidden],.voice-message-panel [hidden] { display:none!important; }
+.voice-message-panel > audio { display:none; }
+.voice-message-panel #voice-message-status { flex:1 1 100%;font-size:12px;font-weight:600;letter-spacing:.015em;color:var(--muted); }
+.voice-message-panel[data-mode=recording] #voice-message-status::before { content:'';display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:var(--danger); }
+.voice-recording-signal { flex:1 1 180px;min-width:0;padding:3px 0; }
+.voice-recording-signal .audio-waveform-bars i { background:var(--accent);opacity:.85; }
+.voice-message-panel button { min-height:36px;padding:6px 12px;border-radius:10px; }
+.voice-preview { display:flex;align-items:center;gap:12px;flex:1 1 100%;min-width:0; }
+#voice-preview-wave { flex:1;min-width:0; }
+.voice-clock { flex:none;font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted); }
+#voice-message-button { flex-shrink:0; }
+#voice-message-button svg { width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8; }
+.audio-waveform { position:relative;flex:1;min-width:50px;height:44px; }
+.audio-waveform-bars { display:flex;align-items:center;justify-content:space-between;gap:3px;height:100%;pointer-events:none; }
+.audio-waveform-bars i { display:block;flex:1;max-width:4px;min-width:1px;border-radius:4px;background:var(--muted);opacity:.35;transition:height 160ms ease-out,background-color 120ms ease-out,opacity 120ms ease-out; }
+.audio-waveform-bars i.is-played { background:var(--accent);opacity:1; }
+.audio-waveform[data-signal=empty] .audio-waveform-bars i { opacity:.22; }
+.audio-waveform .audio-waveform-seek { position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;opacity:0;cursor:pointer; }
+.audio-waveform:focus-within { outline:2px solid var(--focus,var(--accent));outline-offset:4px;border-radius:6px; }
+.voice-play,.discord-shell .voice-play { display:inline-flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;min-height:40px;padding:0;border:0;border-radius:50%;background:var(--accent);color:var(--accent-foreground,#fff);cursor:pointer; }
+.voice-play svg { width:20px;height:20px;fill:currentColor; }
+.voice-play:hover { filter:brightness(1.08); }
+.voice-play:focus-visible { outline:2px solid var(--focus,var(--accent));outline-offset:3px; }
+.discord-shell .file-card.voice-message-card { width:340px;max-width:100%;padding:0;border:0;background:none;box-shadow:none; }
+.voice-message-card > strong,.voice-message-card > small { display:none; }
+.discord-shell .voice-note-bubble { padding:0;background:transparent;box-shadow:none; }
+.chat-media.voice-note { width:100%;margin:6px 0;overflow:visible;border:1px solid var(--line);border-radius:22px;background:var(--panel);color:var(--text); }
+.chat-media.voice-note .chat-media-controls { gap:12px;padding:12px; }
+.voice-note .chat-media-clock { margin:0;min-width:30px;text-align:right;font-size:12px;color:var(--muted); }
+.voice-note .chat-media-status { padding:0 16px 12px!important;font-size:12px;color:var(--muted); }
+.voice-note .chat-media-status[hidden] { display:none; }
+.voice-note .voice-note-wave { min-width:70px; }
+.voice-options { flex:none;position:relative; }
+.voice-options-toggle { display:flex;align-items:center;justify-content:center;list-style:none;width:22px;height:36px;border-radius:8px;font-size:12px;letter-spacing:1px;color:var(--muted);cursor:pointer; }
+.voice-options-toggle::-webkit-details-marker { display:none; }
+.voice-options-toggle:hover,.voice-options[open] .voice-options-toggle { background:var(--hover);color:var(--text); }
+.voice-options-toggle:focus-visible { outline:2px solid var(--focus,var(--accent)); }
+.voice-options-menu { position:absolute;right:0;bottom:calc(100% + 12px);z-index:30;width:230px;max-height:240px;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field,var(--panel));color:var(--text);box-shadow:0 8px 24px #0002; }
+.voice-options-menu .chat-media-button { color:var(--text); }
+.voice-options-menu .chat-media-right { flex-wrap:wrap;justify-content:space-between;gap:8px; }
+.voice-options-menu .chat-media-volume { display:block!important; }
+.voice-options-menu .file-progress,.voice-options-menu .file-recipients { font-size:11px;line-height:1.5;color:var(--muted); }
+.voice-options-menu .file-progress { margin-top:10px; }
+.voice-options-menu .file-actions { margin-top:10px;flex-wrap:wrap; }
+.voice-options-menu input.chat-media-range { --fill:100%; }
+.voice-options-menu .chat-media-range::-webkit-slider-runnable-track { background:var(--line); }
+.voice-options-menu .chat-media-range::-webkit-slider-thumb { background:var(--accent); }
+@media(max-width:640px) { .voice-message-panel { padding:12px;gap:10px; } .voice-message-panel[data-mode=recording] .voice-recording-signal { flex-basis:100%; } .voice-note .chat-media-controls { gap:10px; } .audio-waveform-bars { gap:2px; } }
+@media(prefers-reduced-motion:reduce) { .audio-waveform-bars i { transition:none; } }

@@ -29,7 +29,7 @@
     if(player.url){URL.revokeObjectURL(player.url);player.url='';}
     player.root.classList.remove('chat-media-idle');player.root.style.removeProperty('aspect-ratio');paint(player);
   }
-  function show(player,state,message=''){player.root.dataset.state=state;player.seek.disabled=state!=='ready';player.status.textContent=message;player.status.hidden=!message;}
+  function show(player,state,message=''){player.root.dataset.state=state;player.seek.disabled=state!=='ready';if(player.wave)player.wave.slider.disabled=state!=='ready';player.status.textContent=message;player.status.hidden=!message;}
   function fail(player,message,retry=true){unload(player);show(player,'error',message);player.start.hidden=!retry;}
   function releaseDetached(){if(active&&!active.root.isConnected)unload(active);}
 
@@ -38,7 +38,14 @@
     const run=++player.load,session=epoch,alive=()=>run===player.load&&session===epoch&&player.root.isConnected;
     active=player;show(player,'loading','Loading…');
     try{
-      const info=await api.invoke('chat_media_info',player.scope);
+      let info=await api.invoke('chat_media_info',player.scope);
+      if(!alive())return;
+      if(!info && player.name==='Voice message.wav') {
+        show(player,'loading','Receiving voice message…');
+        await api.invoke('receive_chat_media',player.scope);
+        if(!alive())return;
+        info=await api.invoke('chat_media_info',player.scope);
+      }
       if(!alive())return;
       if(!info)return fail(player,'This file is no longer available on this device.',false);
       if(info.too_large)return fail(player,'This file is too large to play in chat. Open the saved file instead.',false);
@@ -52,6 +59,12 @@
         show(player,'loading',`Loading… ${Math.floor(offset*100/info.size)}%`);
       }
       player.url=URL.createObjectURL(new Blob(parts,{type:player.kind==='audio'?info.mime.replace(/^video\//,'audio/'):info.mime}));
+      if(player.wave) {
+        const waveform=window.OchatWaveform.pcm(new Uint8Array(await new Blob(parts).arrayBuffer()));
+        if(!alive()) { URL.revokeObjectURL(player.url); player.url=''; return; }
+        player.wave.set(waveform?.peaks || []);
+        if(waveform)player.voiceDuration=waveform.duration;
+      }
       player.media.src=player.url;player.media.volume=volume;player.media.muted=muted;
       show(player,'ready');paint(player);
       // A long load can outlive the click's activation: stay ready and let the user press play.
@@ -64,6 +77,13 @@
     const {media,seek,clockLabel,toggle,mute,loudness}=player,duration=Number.isFinite(media.duration)?media.duration:0;
     if(!player.dragging){seek.value=String(duration?Math.round(media.currentTime/duration*1000):0);fill(seek);}
     clockLabel.textContent=`${clock(media.currentTime)} / ${clock(duration)}`;
+    if(player.wave) {
+      const voiceDuration=duration || player.voiceDuration || 0;
+      player.wave.progress(voiceDuration?media.currentTime/voiceDuration:0,voiceDuration);
+      player.wave.slider.disabled=player.root.dataset.state!=='ready';
+      clockLabel.textContent=voiceDuration?clock(media.currentTime>0?Math.max(0,voiceDuration-media.currentTime):voiceDuration):'—:—';
+      player.root.dataset.playing=String(!media.paused);
+    }
     seek.setAttribute('aria-valuetext',clock(media.currentTime));
     setIcon(toggle,media.paused?'play':'pause',media.paused?'Play':'Pause');
     setIcon(mute,media.muted||!media.volume?'muted':'volume',media.muted?'Unmute':'Mute');
@@ -127,7 +147,23 @@
     root.onfocusin=()=>wake(player);
     root.addEventListener('keydown',event=>onKey(player,event));
     show(player,'idle');media.volume=volume;media.muted=muted;paint(player);
-    card.querySelector('.file-progress').before(root);card.classList.add('has-media');window.OchatTimeline?.settle?.();
+    card.querySelector('.file-progress').before(root);card.classList.add('has-media');
+    if(source.name==='Voice message.wav' && window.OchatWaveform) {
+      card.classList.add('voice-message-card'); root.classList.add('voice-note');
+      root.setAttribute('aria-label','Voice message');
+      player.voiceDuration=source.size>=46 && source.size<=17280044?(source.size-44)/96000:0;
+      player.wave=window.OchatWaveform.create({seek:fraction=>{const duration=media.duration;if(Number.isFinite(duration)){media.currentTime=fraction*duration;paint(player);}}});
+      player.wave.root.classList.add('voice-note-wave');
+      const options=node('details','voice-options'),summary=node('summary','voice-options-toggle','•••'),menu=node('div','voice-options-menu');
+      summary.setAttribute('aria-label','Voice message options');summary.title='Voice message options';
+      menu.append(right);
+      for(const extra of [...card.querySelectorAll(':scope > .file-progress, :scope > .file-recipients, :scope > .file-actions')])menu.append(extra);
+      options.append(summary,menu);options.onclick=event=>event.stopPropagation();
+      options.addEventListener('keydown',event=>{if(event.key==='Escape'){options.open=false;summary.focus();event.stopPropagation();}});
+      controls.replaceChildren(toggle,player.wave.root,clockLabel,options);
+      toggle.classList.add('voice-play'); seek.hidden=true; paint(player);
+    }
+    window.OchatTimeline?.settle?.();
   }
 
   function markReceived(card){const actions=card.querySelector('.file-actions');if(card.dataset.outgoing==='true'||!actions)return;actions.remove();card.querySelector('.file-progress').textContent='Received and verified';}
@@ -136,8 +172,11 @@
     if(!api||!kindOf(source.name))return;
     releaseDetached();sources.set(card,source);
     const session=epoch;
-    api.invoke('chat_media_info',{room:source.room,peer:source.peer,id:source.id}).then(info=>{if(info&&session===epoch){markReceived(card);insert(card);}},()=>{});
+    if(source.name==='Voice message.wav')queueMicrotask(()=>{if(session===epoch)insert(card);});
+    api.invoke('chat_media_info',{room:source.room,peer:source.peer,id:source.id}).then(info=>{if(session===epoch){if(info)markReceived(card);if(info||source.name==='Voice message.wav')insert(card);}},()=>{});
   }
+  document.addEventListener('pointerdown',event=>{for(const menu of document.querySelectorAll('.voice-options[open]'))if(!menu.contains(event.target))menu.open=false;});
   function reset(){epoch++;if(active)unload(active);active=null;volume=1;muted=false;}
-  window.OchatChatMedia=Object.freeze({init(callbacks){api=callbacks;},attach,received:insert,storesInline:offer=>!!kindOf(offer?.name)&&offer.size<=MAX_PREVIEW,reset});
+  function remove(card){if(active&&card.contains(active.root))unload(active);sources.delete(card);card.remove();}
+  window.OchatChatMedia=Object.freeze({init(callbacks){api=callbacks;},attach,received:insert,storesInline:offer=>!!kindOf(offer?.name)&&offer.size<=MAX_PREVIEW,reset,remove});
 })();

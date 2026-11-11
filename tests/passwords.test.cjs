@@ -11,7 +11,7 @@ test('all account password controls preserve selection, mask on leaving and clea
   let submits=0;
   window.document.addEventListener('submit',e=>{e.preventDefault();submits++;});
   const fields=[...window.document.querySelectorAll('[data-private-password]')];
-  assert.equal(fields.length,9);
+  assert.equal(fields.length,11);
   for(const input of fields){
     const button=input.parentElement.querySelector('button');
     assert.equal(button.type,'button');

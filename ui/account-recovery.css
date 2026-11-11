@@ -1,0 +1,16 @@
+.account-recovery-choice { display:grid;gap:12px;margin:20px 0; }
+.account-recovery-choice[hidden] { display:none; }
+.auth-dialog .recovery-option { display:flex;align-items:center;gap:14px;width:100%;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);text-align:left; }
+.auth-dialog .recovery-option:hover { border-color:var(--accent);background:var(--hover); }
+.auth-dialog .recovery-option:focus-visible { outline:2px solid var(--accent);outline-offset:3px; }
+.recovery-option strong,.recovery-option small { display:block; }
+.recovery-option strong { font-size:14px;line-height:1.5; }
+.recovery-option small { margin-top:4px;color:var(--muted);font-size:12px;line-height:1.5; }
+.recovery-option-icon { display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:12px;background:var(--selection);color:var(--accent);font-size:24px; }
+.destructive-option .recovery-option-icon { color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,var(--panel)); }
+.account-reset-warning { margin:16px 0;padding:16px;border:1px solid color-mix(in srgb,var(--danger) 30%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--danger) 5%,var(--panel));font-size:13px;line-height:1.5; }
+.account-reset-warning p { margin:10px 0 0; }
+#reset-local-account-form .danger { min-height:44px;padding:10px 14px;border:0;border-radius:12px;background:color-mix(in srgb,var(--danger) 65%,#000);color:white;font-weight:600; }
+#reset-account-confirmation { font-family:ui-monospace,monospace;font-size:13px; }
+#recover-account-key { font-family:ui-monospace,monospace;font-size:12px;overflow-wrap:anywhere; }
+.auth-dialog .auth-links { display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-top:20px; }

@@ -5410,7 +5410,7 @@ dependencies = [
 
 [[package]]
 name = "ochat"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -5435,7 +5435,7 @@ dependencies = [
 
 [[package]]
 name = "ochat-core"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "argon2",

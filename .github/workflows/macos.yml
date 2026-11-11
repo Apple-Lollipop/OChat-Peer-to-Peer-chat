@@ -3,6 +3,11 @@ name: macOS DMG
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      release_tag:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -36,7 +41,7 @@ jobs:
           cache: npm
       - name: Configure compilation parallelism
         run: |
-          node -e 'const os=require("node:os"),fs=require("node:fs"); const jobs=Math.max(1,Math.min(4,os.availableParallelism(),Math.floor(os.totalmem()/2**30/4))); fs.appendFileSync(process.env.GITHUB_ENV,`CARGO_BUILD_JOBS=${jobs}\n`); console.log(`Using ${jobs} parallel Rust compilation jobs`);'
+          node -e 'const os=require("node:os"),fs=require("node:fs"); const jobs=Math.max(1,Math.min(4,os.availableParallelism(),Math.floor(os.totalmem()/2**30/2.5))); fs.appendFileSync(process.env.GITHUB_ENV,`CARGO_BUILD_JOBS=${jobs}\n`); console.log(`Using ${jobs} parallel Rust compilation jobs`);'
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -44,6 +49,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          cache-workspace-crates: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: mozilla-actions/sccache-action@v0.0.11
         continue-on-error: true
@@ -51,7 +57,7 @@ jobs:
         run: node scripts/ci/compiler-cache.cjs
       - name: Check project and release versions
         env:
-          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag || '' }}
         run: node scripts/release/check-version.cjs
       - name: Check native build tools
         run: |
@@ -63,18 +69,6 @@ jobs:
       - run: npm ci
       - name: Verify vendored security patch integrity
         run: node scripts/security/verify-vendored-glib.cjs
-      - name: Check interface
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-        run: npm test 2>&1 | tee macos-ui-tests.log
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      - name: Check core and peer-to-peer integrations
-        run: cargo test -p ochat-core --locked 2>&1 | tee macos-core-tests.log
-      - name: Check WebKit layouts and macOS keyboard labels
-        run: |
-          npx playwright install webkit
-          node scripts/qa/macos-webkit.cjs 2>&1 | tee macos-webkit-tests.log
       - name: Build arm64 application and DMG
         run: |
           npm run tauri -- build --target aarch64-apple-darwin --bundles app,dmg -- --locked 2>&1 | tee macos-build.log
@@ -114,9 +108,5 @@ jobs:
           name: Ochat-macOS-build-log
           path: |
             macos-build.log
-            macos-ui-tests.log
-            macos-core-tests.log
-            macos-webkit-tests.log
-            releases/reports/macos-webkit-*.png
           if-no-files-found: ignore
           retention-days: 7

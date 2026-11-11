@@ -400,6 +400,14 @@ impl ChatNode {
     }
 
     pub(crate) fn friend_view(&self, friend: Friend) -> Result<FriendView> {
+        let last_message_at = match (
+            friend.status.as_str(),
+            friend.direct_room,
+            self.vault.as_ref(),
+        ) {
+            ("accepted", Some(room), Some(vault)) => super::friend_activity::latest(vault, room)?,
+            _ => 0,
+        };
         let profile = self
             .vault
             .as_ref()
@@ -417,6 +425,7 @@ impl ChatNode {
                     .is_none_or(|p| p.availability != "invisible")
         });
         Ok(FriendView {
+            last_message_at,
             availability: if session.is_some() {
                 self.peer_availability(&friend.peer)
             } else {

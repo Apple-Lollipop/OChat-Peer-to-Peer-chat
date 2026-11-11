@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
-async function setup(t,{info={size:6,mime:'video/mp4',too_large:false},chunks=[new Uint8Array([1,2,3,4]).buffer,[5,6]],saved=true,name=''}={}){
+async function setup(t,{info={size:6,mime:'video/mp4',too_large:false},chunks=[new Uint8Array([1,2,3,4]).buffer,[5,6]],saved=true,name='',receive=false}={}){
  const {Window}=await import('happy-dom');const w=new Window({url:'http://tauri.localhost',settings:{enableJavaScriptEvaluation:true,suppressInsecureJavaScriptEnvironmentWarning:true}});t.after(()=>w.happyDOM.close());
  w.document.body.innerHTML='<div id="host"><div class="file-card"><strong>clip.mp4</strong><div class="file-progress"></div></div></div>';
  const calls=[],blobs=[],revoked=[],toasts=[];let next=0;
@@ -10,8 +10,9 @@ async function setup(t,{info={size:6,mime:'video/mp4',too_large:false},chunks=[n
  Object.defineProperty(w.HTMLMediaElement.prototype,'paused',{configurable:true,get(){return this.__paused!==false;}});
  Object.defineProperty(w.HTMLMediaElement.prototype,'duration',{configurable:true,get(){return this.__duration??100;}});
  const fullscreen=[],fullscreenOptions=[];w.OchatFullscreen={active:()=>false,exit:async()=>{},toggle:async(target,options)=>{fullscreen.push(target);fullscreenOptions.push(options);}};
+ w.eval(fs.readFileSync('ui/audio-waveform.js','utf8'));
  w.eval(fs.readFileSync('ui/chat-media.js','utf8'));
- const invoke=async(command,args)=>{calls.push([command,args]);if(command==='chat_media_info')return info;if(command==='chat_media_chunk')return chunks[next++];if(command==='save_chat_media')return saved;throw Error('Unexpected '+command);};
+ const invoke=async(command,args)=>{calls.push([command,args]);if(command==='chat_media_info')return receive&&!calls.some(c=>c[0]==='receive_chat_media')?null:info;if(command==='receive_chat_media')return true;if(command==='chat_media_chunk')return chunks[next++];if(command==='save_chat_media')return saved;throw Error('Unexpected '+command);};
  w.OchatChatMedia.init({invoke,toast:message=>toasts.push(String(message))});
  const card=w.document.querySelector('.file-card'),source={room:'room-a',peer:'peer-a',id:'file-a',name:'clip.mp4'};
  if(name)source.name=name;
@@ -105,4 +106,27 @@ test('audio in a shared container is typed as audio, and F does nothing without 
 });
 test('audio names are stored inside the app like videos',async t=>{
  const s=await setup(t),{storesInline}=s.w.OchatChatMedia;for(const name of ['a.mp3','a.m4a','a.aac','a.FLAC','a.wav','a.ogg','a.oga','a.opus','a.weba'])assert.equal(storesInline({name,size:10}),true,name);assert.equal(storesInline({name:'a.mp3.exe',size:10}),false);
+});
+
+
+test('received voice messages fetch nothing until Play and then use verified encrypted media',async t=>{
+ const s=await setup(t,{name:'Voice message.wav',info:{size:6,mime:'audio/wav',too_large:false},receive:true});
+ s.w.OchatChatMedia.attach(s.card,s.source);await tick();assert.ok(s.player());
+ assert.equal(s.calls.some(c=>c[0]==='receive_chat_media'),false);
+ click(s,'.chat-media-controls .chat-media-button');for(let i=0;i<8;i++)await tick();
+ assert.equal(s.calls.filter(c=>c[0]==='receive_chat_media').length,1);
+ assert.equal(s.player().dataset.state,'ready');assert.equal(s.blobs[0].type,'audio/wav');
+});
+
+
+test('voice notes use a compact waveform with seek, duration and discreet secondary controls',async t=>{
+ const s=await setup(t,{name:'Voice message.wav',info:{size:6,mime:'audio/wav',too_large:false}});
+ s.w.OchatChatMedia.attach(s.card,{...s.source,size:960044});await tick();
+ assert.ok(s.card.classList.contains('voice-message-card'));assert.equal(s.player().getAttribute('aria-label'),'Voice message');
+ assert.equal(s.card.querySelectorAll('.audio-waveform-bars i').length,48);
+ assert.ok(s.card.querySelector('.voice-options-menu .chat-media-volume'));assert.ok(s.card.querySelector('.voice-options-menu .chat-media-save'));
+ const menu=s.card.querySelector('.voice-options');menu.open=true;menu.dispatchEvent(new s.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(menu.open,false);
+ click(s,'.voice-play');for(let i=0;i<8;i++)await tick();
+ const seek=s.card.querySelector('.audio-waveform-seek');assert.equal(seek.disabled,false);seek.value='500';seek.dispatchEvent(new s.w.Event('input'));
+ assert.equal(s.card.querySelector('audio').currentTime,50);assert.equal(s.card.querySelectorAll('.is-played').length,24);
 });

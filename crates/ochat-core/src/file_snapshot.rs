@@ -123,6 +123,20 @@ impl StageWriter {
     }
 }
 impl StagedFile {
+    pub(super) fn from_bytes(bytes: &[u8], directory: Option<&Path>) -> Result<Arc<Self>> {
+        let temp = if directory.is_none() {
+            Some(tempfile::tempdir()?)
+        } else {
+            None
+        };
+        let dir = directory
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| temp.as_ref().unwrap().path().to_path_buf());
+        let mut writer = StageWriter::open(&dir, temp)?;
+        writer.append(bytes)?;
+        writer.finish()
+    }
+
     pub(super) fn capture(
         source: &Path,
         directory: Option<&Path>,
@@ -278,6 +292,12 @@ pub(super) fn open_received(
     peer: &str,
     id: Uuid,
 ) -> Result<Option<Arc<StagedFile>>> {
+    if vault
+        .get::<crate::message_tools::Update>(&format!("updates/{room}/{peer}/{id}/edit"))?
+        .is_some_and(|update| update.deleted())
+    {
+        return Ok(None);
+    }
     let Some(record) = vault.get::<Record>(&received_key(room, id, peer))? else {
         return Ok(None);
     };
@@ -294,6 +314,39 @@ pub(super) fn open_received(
         _temp: None,
         durable: AtomicBool::new(true),
     })))
+}
+/// Revoke Ochat's encrypted snapshot and key, leaving user-exported copies alone.
+pub(super) fn remove_message_media(
+    vault: &Vault,
+    room: Uuid,
+    peer: &str,
+    id: Uuid,
+    own: bool,
+) -> Result<()> {
+    let mut keys = vec![(
+        received_key(room, id, peer),
+        received_directory(vault, room),
+    )];
+    if own {
+        keys.push((
+            format!("send_file/{room}/{id}"),
+            vault
+                .directory()
+                .join("file-staging")
+                .join(room.to_string()),
+        ));
+    }
+    for (key, folder) in keys {
+        if let Some(value) = vault.get::<serde_json::Value>(&key)? {
+            vault.delete_prefix(&key)?;
+            // A reader may still hold a Windows file handle. The signed tombstone
+            // and revoked key remain authoritative even if physical cleanup waits.
+            if let Ok(record) = serde_json::from_value::<Record>(value) {
+                let _ = std::fs::remove_file(folder.join(format!("{}.bin", record.context)));
+            }
+        }
+    }
+    Ok(())
 }
 pub(super) fn restore(
     vault: &Vault,

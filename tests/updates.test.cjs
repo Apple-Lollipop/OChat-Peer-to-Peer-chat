@@ -18,7 +18,7 @@ test('new stable releases offer a choice once and open only the fixed GitHub pag
  await a.w.OchatUpdates.accountOpened();assert.equal(a.calls(),1);
  a.get('check-for-updates').click();await flush();assert.equal(a.calls(),2);
  a.get('update-notice').querySelector('.primary').click();await flush();
- assert.deepEqual(a.opened,['https://github.com/Apple-Lollipop/ochat/releases/latest']);assert.equal(a.get('update-notice').hidden,true);
+ assert.deepEqual(a.opened,['https://github.com/Apple-Lollipop/OChat-Peer-to-Peer-chat/releases/latest']);assert.equal(a.get('update-notice').hidden,true);
 });
 test('automatic checks honor saved opt-out while manual checks remain available and report up-to-date versions',async t=>{
  const a=await setup(t,()=>({available:false,current:'0.0.2',latest:'0.0.2'}));a.context.settings.automatic_update_checks=false;

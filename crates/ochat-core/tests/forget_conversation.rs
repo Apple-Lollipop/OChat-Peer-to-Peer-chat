@@ -73,6 +73,11 @@ async fn local_deletion_preserves_other_peers_rooms_and_survives_restart() {
         }
     }
     assert!(observed_removal);
+    assert_eq!(
+        bv.get::<u64>(&format!("conversation_activity/{removed}"))
+            .unwrap(),
+        Some(0)
+    );
     assert_eq!(bob.snapshot().room.unwrap().id, kept);
     assert_eq!(bob.snapshots().len(), 1);
     assert!(bob.history(removed).unwrap().is_empty());
@@ -104,6 +109,11 @@ async fn local_deletion_preserves_other_peers_rooms_and_survives_restart() {
     let bob = ChatHub::start_with_vault(bv.clone()).await.unwrap();
     assert_eq!(bob.archived_rooms().unwrap().len(), 1);
     assert!(bob.reopen_room(removed).await.is_err());
+    assert_eq!(
+        bv.get::<u64>(&format!("conversation_activity/{removed}"))
+            .unwrap(),
+        Some(0)
+    );
     assert!(bob.history(removed).unwrap().is_empty());
     // Rejoining is deliberate and never restores the deleted messages.
     bob.join(&invite).await.unwrap();

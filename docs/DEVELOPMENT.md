@@ -128,3 +128,9 @@ Offline messages remain queued on the sending device until the recipients reconn
 ## Local artifacts
 
 `releases/`, `local-data/`, build caches, profiles and backup files are excluded from Git. Preserve existing profiles and releases when preparing a new build. Use release manifests and SHA-256 files to identify local binaries; a source push does not publish binary assets to a GitHub Release.
+
+### Forgotten local password
+
+The unlock screen offers **Forgot password? → Use my recovery key**. With the existing local profile present, the key can authenticate an encrypted account record and set a new local password without changing identity or re-encrypting history. This does not recreate missing data: use **Import encrypted backup** with the archive and its recovery key when moving devices or restoring lost files.
+
+**Start over** instead deletes the locked profile's local data after a fresh native confirmation, an acknowledgement and the exact phrase `DELETE MY ACCOUNT`. Another running instance, a changed account header or a linked account directory prevents reset. The reset does not remove exports/downloads outside the profile directory or other participants' copies. It is file deletion, not a guarantee of forensic erasure from storage snapshots or SSDs.

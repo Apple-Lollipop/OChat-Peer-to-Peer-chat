@@ -123,6 +123,7 @@ struct Shared {
     clipped_blocks: AtomicU64,
     encoded: Mutex<HashMap<String, VecDeque<Vec<u8>>>>,
     test_capture: Mutex<Option<(Vec<f32>, Vec<f32>)>>,
+    message_capture: Mutex<Option<zeroize::Zeroizing<Vec<f32>>>>,
     loopback_reference: Mutex<VecDeque<f32>>,
     loopback_reference_active: AtomicBool,
     system_mixer: Mutex<crate::stereo::StereoQueues>,
@@ -159,6 +160,7 @@ impl AudioSession {
             clipped_blocks: AtomicU64::new(0),
             encoded: Mutex::new(HashMap::new()),
             test_capture: Mutex::new(None),
+            message_capture: Mutex::new(None),
             loopback_reference: Mutex::new(VecDeque::new()),
             loopback_reference_active: AtomicBool::new(false),
             system_mixer: Mutex::new(HashMap::new()),
@@ -220,6 +222,36 @@ impl AudioSession {
                 bail!("Audio device initialization failed or timed out")
             }
         }
+    }
+    /// Explicit local recording only. The network encoder remains muted.
+    pub async fn start_message(settings: AudioSettings) -> Result<Self> {
+        let (session, _packets) =
+            Self::start_with_settings(Arc::new(AtomicBool::new(true)), settings).await?;
+        *session.shared.message_capture.lock().unwrap() = Some(zeroize::Zeroizing::new(Vec::new()));
+        Ok(session)
+    }
+    pub fn message_samples(&self) -> usize {
+        self.shared
+            .message_capture
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map_or(0, |samples| samples.len())
+    }
+    pub async fn finish_message(self) -> Result<Vec<u8>> {
+        let samples = self
+            .shared
+            .message_capture
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap_or_default();
+        let failure = self.take_error();
+        self.shutdown().await?;
+        if let Some(failure) = failure {
+            bail!(failure);
+        }
+        crate::voice_message::encode_wav(&samples)
     }
     pub fn level(&self) -> f32 {
         f32::from_bits(self.shared.level.load(Ordering::Relaxed))
@@ -749,6 +781,13 @@ fn run_audio(
                 if original.len() + BLOCK <= RATE as usize * 5 {
                     original.extend(&near);
                     filtered.extend(processed);
+                }
+            }
+            if let Some(samples) = shared.message_capture.lock().unwrap().as_mut() {
+                if samples.len() + BLOCK <= crate::voice_message::MAX_SAMPLES {
+                    samples.extend_from_slice(&processed);
+                } else {
+                    shared.stop.store(true, Ordering::Release);
                 }
             }
             let level = (processed.iter().map(|s| s * s).sum::<f32>() / BLOCK as f32)

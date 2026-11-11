@@ -18,6 +18,8 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+mod account_recovery_commands;
+use account_recovery_commands::*;
 mod capture_permissions;
 mod channel_commands;
 mod command_access;
@@ -38,6 +40,8 @@ use library_commands::*;
 use photo_commands::*;
 mod linux_screen;
 use linux_screen::*;
+mod voice_message_commands;
+use voice_message_commands::*;
 mod chat_media_commands;
 mod shortcut_keys;
 mod shortcuts;
@@ -86,6 +90,8 @@ struct Effects {
     last_ping: SyncMutex<MessageSoundGate>,
     ping: SyncMutex<Option<Arc<AtomicBool>>>,
     test: SyncMutex<Option<TestRun>>,
+    recording: SyncMutex<Option<voice_message_commands::Recording>>,
+    recording_epoch: AtomicU64,
 }
 impl Effects {
     fn stop_ring(&self) {
@@ -94,6 +100,8 @@ impl Effects {
         }
     }
     fn stop_test(&self) {
+        self.recording_epoch.fetch_add(1, Ordering::SeqCst);
+        self.recording.lock().unwrap().take();
         if let Some(test) = self.test.lock().unwrap().take() {
             test.cancel.store(true, Ordering::Release);
         }
@@ -330,6 +338,7 @@ struct DesktopState {
     session: Mutex<Option<Session>>,
     effects: Arc<Effects>,
     pending_backup: Mutex<Option<PathBuf>>,
+    pending_reset: Mutex<Option<account_recovery_commands::ResetConfirmation>>,
 }
 async fn node(state: &DesktopState) -> Reply<Arc<ChatNode>> {
     state
@@ -1423,6 +1432,11 @@ fn main() {
                 return true;
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                start_voice_message,
+                voice_message_status,
+                finish_voice_message,
+                cancel_voice_message,
+                send_voice_message,
                 discord_webhook_status,
                 save_discord_webhook,
                 notify_discord_online,
@@ -1496,6 +1510,9 @@ fn main() {
                 set_peer_volume,
                 pause_shortcuts,
                 account_status,
+                recover_local_password,
+                prepare_account_reset,
+                reset_local_account,
                 create_account,
                 unlock_account,
                 lock_account,

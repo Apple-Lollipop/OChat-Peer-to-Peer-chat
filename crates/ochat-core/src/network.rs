@@ -41,6 +41,8 @@ mod contact_presence;
 mod contacts;
 #[path = "file_snapshot.rs"]
 mod file_snapshot;
+#[path = "friend_activity.rs"]
+mod friend_activity;
 #[path = "governance_node.rs"]
 mod governance_node;
 #[path = "inline_image_node.rs"]
@@ -1051,6 +1053,7 @@ impl ChatNode {
         let mut forgotten = self.forgotten_rooms.lock().unwrap();
         if let Some(vault) = &self.vault {
             vault.forget_room(room)?;
+            friend_activity::clear(vault, room)?;
         }
         forgotten.insert(room);
         drop(forgotten);
@@ -1479,6 +1482,26 @@ impl ChatNode {
             return;
         }
         if self.vault.is_none() {
+            if let Event::FileOffered {
+                room, peer, offer, ..
+            } = &event
+            {
+                let key = format!("history/{room}/{peer}/{}", offer.id);
+                let mut tools = self.tools.lock().unwrap();
+                let timestamp = tools
+                    .messages
+                    .get(&key)
+                    .map(|entry| entry.timestamp)
+                    .unwrap_or_else(now);
+                tools.messages.insert(
+                    key,
+                    HistoryEntry {
+                        room: *room,
+                        timestamp,
+                        event: serde_json::to_value(&event).unwrap_or_default(),
+                    },
+                );
+            }
             if let Event::Message {
                 room,
                 peer,
@@ -1528,18 +1551,25 @@ impl ChatNode {
                         };
                         self.project_message(&mut entry)?;
                         vault.put(&format!("history/{room}/{peer}/{id}"), &entry)?;
+                        friend_activity::record(vault, *room, *timestamp)?;
                     }
                     Event::FileOffered { offer, peer, .. } => {
                         let room = self.room.lock().unwrap().as_ref().map(|r| r.id);
                         if let Some(room) = room {
+                            let key = format!("history/{room}/{peer}/{}", offer.id);
+                            let timestamp = vault
+                                .get::<HistoryEntry>(&key)?
+                                .map(|entry| entry.timestamp)
+                                .unwrap_or_else(now);
                             vault.put(
-                                &format!("history/{room}/{peer}/{}", offer.id),
+                                &key,
                                 &HistoryEntry {
                                     room,
-                                    timestamp: now(),
+                                    timestamp,
                                     event: serde_json::to_value(&event)?,
                                 },
                             )?;
+                            friend_activity::record(vault, room, timestamp)?;
                         }
                     }
                     Event::FileDecision { room, id, peer, .. } => vault.put(
@@ -2877,6 +2907,9 @@ impl ChatNode {
             }
             Wire::File { offer } => {
                 offer.validate()?;
+                if self.attachment_deleted(room_id, peer, offer.id)? {
+                    return Ok(());
+                }
                 let declined = self
                     .vault
                     .as_ref()
@@ -3248,6 +3281,59 @@ impl ChatNode {
             file_snapshot::StagedFile::capture(&path, directory.as_deref(), id)
         })
         .await??;
+        self.publish_staged_file(room_id, channel, id, name, size, hash, source)
+            .await
+    }
+    /// Voice recordings enter encrypted staging directly from memory.
+    pub async fn offer_voice_message(
+        &self,
+        channel: Option<Uuid>,
+        bytes: Vec<u8>,
+    ) -> Result<FileOffer> {
+        crate::voice_message::validate_wav(&bytes)?;
+        let channel = self.accept_text_channel(channel)?;
+        let room = self.snapshot().room.context("No active room")?.id;
+        ensure!(
+            self.files.lock().unwrap().len() < 32,
+            "You can offer up to 32 files per session"
+        );
+        let id = Uuid::new_v4();
+        let directory = self
+            .vault
+            .as_ref()
+            .map(|v| v.directory().join("file-staging").join(room.to_string()));
+        let (stage, size, hash) = tokio::task::spawn_blocking(move || {
+            let bytes = zeroize::Zeroizing::new(bytes);
+            let stage = file_snapshot::StagedFile::from_bytes(&bytes, directory.as_deref())?;
+            Ok::<_, anyhow::Error>((
+                stage,
+                bytes.len() as u64,
+                blake3::hash(&bytes).to_hex().to_string(),
+            ))
+        })
+        .await??;
+        self.publish_staged_file(
+            room,
+            channel,
+            id,
+            "Voice message.wav".into(),
+            size,
+            hash,
+            stage,
+        )
+        .await
+    }
+    #[allow(clippy::too_many_arguments)]
+    async fn publish_staged_file(
+        &self,
+        room_id: Uuid,
+        channel: Option<Uuid>,
+        id: Uuid,
+        name: String,
+        size: u64,
+        hash: String,
+        source: Arc<file_snapshot::StagedFile>,
+    ) -> Result<FileOffer> {
         let offer = FileOffer {
             channel,
             id,
@@ -3297,6 +3383,12 @@ impl ChatNode {
         Ok(Some((offer.size, stage.read_range(position, max)?)))
     }
     pub fn incoming_offer(&self, peer: &str, id: Uuid) -> Result<FileOffer> {
+        if let Some(room) = self.room.lock().unwrap().as_ref().map(|room| room.id) {
+            ensure!(
+                !self.attachment_deleted(room, peer, id)?,
+                "This message was deleted"
+            );
+        }
         if let Some(offer) = self
             .received
             .lock()
@@ -3566,6 +3658,10 @@ impl ChatNode {
             let mut buf = vec![0; 64 * 1024];
             let mut update = Instant::now();
             while let Some(len) = timeout(Duration::from_secs(30), recv.read(&mut buf)).await?? {
+                ensure!(
+                    !self.attachment_deleted(room, peer, id)?,
+                    "This message was deleted"
+                );
                 count += len as u64;
                 ensure!(count <= offer.size, "File is too large");
                 hash.update(&buf[..len]);
@@ -3593,7 +3689,14 @@ impl ChatNode {
             );
             ensure!(media_mime(&head).is_some(), MEDIA_NOT_PLAYABLE);
             let stage = tokio::task::spawn_blocking(move || writer.finish()).await??;
-            stage.persist_received(&vault, room, peer, &offer)?;
+            {
+                let _barrier = self.tool_room_guard(room)?;
+                ensure!(
+                    !self.attachment_deleted(room, peer, id)?,
+                    "This message was deleted"
+                );
+                stage.persist_received(&vault, room, peer, &offer)?;
+            }
             self.received.lock().unwrap().remove(&(peer.into(), id));
             write_frame(&mut send, &true).await?;
             send.finish()?;
@@ -4056,6 +4159,7 @@ impl ChatNode {
             vault.delete_prefix(&format!("delivery/{room}/"))?;
             vault.delete_prefix(&format!("missed_call/{room}/"))?;
             vault.delete_prefix(&format!("history/{room}/"))?;
+            friend_activity::clear(vault, room)?;
             vault.delete_prefix(&format!("file_decisions/{room}/"))?;
         }
         Ok(())

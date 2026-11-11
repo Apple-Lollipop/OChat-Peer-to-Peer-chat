@@ -26,6 +26,8 @@ const MAX_BACKUP: u64 = 256 * 1024 * 1024;
 mod vault_blobs;
 #[path = "vault_media.rs"]
 mod vault_media;
+#[path = "vault_recovery.rs"]
+mod vault_recovery;
 #[derive(Serialize, Deserialize)]
 struct Header {
     version: u8,
@@ -135,6 +137,27 @@ fn decrypt(
         .decrypt(&XNonce::from(*nonce), Payload { msg: bytes, aad })
         .map(Zeroizing::new)
         .map_err(|_| anyhow::anyhow!("Incorrect password or key, or damaged encrypted data"))
+}
+fn parse_recovery_key(recovery: &str) -> Result<Zeroizing<[u8; 32]>> {
+    ensure!(recovery.len() <= 256, "Invalid recovery key length");
+    let body = recovery
+        .trim()
+        .strip_prefix("ochat-recovery1:")
+        .context("Invalid recovery key format")?;
+    let (encoded, checksum) = body.split_once('.').context("Invalid recovery key")?;
+    let bytes = Zeroizing::new(
+        URL_SAFE_NO_PAD
+            .decode(encoded)
+            .context("Invalid recovery key")?,
+    );
+    let root = Zeroizing::new(
+        <[u8; 32]>::try_from(bytes.as_slice()).context("Invalid recovery key length")?,
+    );
+    ensure!(
+        blake3::hash(&*root).to_hex()[..8] == *checksum,
+        "Recovery key checksum does not match"
+    );
+    Ok(root)
 }
 fn password_valid(password: &str) -> Result<()> {
     ensure!(
@@ -323,6 +346,9 @@ impl Vault {
     }
     pub fn change_password(&self, old: &str, new: &str) -> Result<()> {
         let _ = self.reveal_key(old)?;
+        self.rewrap_password(new)
+    }
+    fn rewrap_password(&self, new: &str) -> Result<()> {
         password_valid(new)?;
         let salt: [u8; 16] = rand::random();
         let nonce: [u8; 24] = rand::random();
@@ -818,24 +844,7 @@ impl Vault {
     ) -> Result<()> {
         password_valid(password)?;
 
-        ensure!(recovery.len() <= 256, "Invalid recovery key length");
-        let body = recovery
-            .trim()
-            .strip_prefix("ochat-recovery1:")
-            .context("Invalid recovery key format")?;
-        let (encoded, checksum) = body.split_once('.').context("Invalid recovery key")?;
-        let bytes = Zeroizing::new(
-            URL_SAFE_NO_PAD
-                .decode(encoded)
-                .context("Invalid recovery key")?,
-        );
-        let root = Zeroizing::new(
-            <[u8; 32]>::try_from(bytes.as_slice()).context("Invalid recovery key length")?,
-        );
-        ensure!(
-            blake3::hash(&*root).to_hex()[..8] == *checksum,
-            "Recovery key checksum does not match"
-        );
+        let root = parse_recovery_key(recovery)?;
         let backup: Backup = serde_json::from_slice(&read_bounded(path, MAX_BACKUP)?)
             .context("Invalid backup file")?;
         ensure!(

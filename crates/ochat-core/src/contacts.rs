@@ -100,6 +100,7 @@ pub struct Friend {
 }
 #[derive(Clone, Serialize)]
 pub struct FriendView {
+    pub last_message_at: u64,
     pub availability: String,
     pub presence_online: bool,
     pub profile_known: bool,

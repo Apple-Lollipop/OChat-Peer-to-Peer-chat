@@ -39,7 +39,7 @@
       const controls=row.querySelector('.friend-controls'),remove=controls?.querySelector('.danger'),identity=row.querySelector('.friend-identity');
       if(remove&&!row.querySelector('.friend-more')){
         const menu=node('details','friend-more'),summary=node('summary','','•••');summary.setAttribute('aria-label','More options for '+row.querySelector('strong').textContent);
-        const content=node('div','friend-more-content');if(identity)content.append(identity);content.append(remove);menu.append(summary,content);controls.append(menu);
+        const content=node('div','friend-more-content');if(identity)content.append(identity);const profile=controls.querySelector('.friend-profile-action');if(profile)content.append(profile);content.append(remove);menu.append(summary,content);controls.append(menu);
       }
     }
     filterFriends();

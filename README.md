@@ -54,7 +54,7 @@ Encrypted peer-to-peer conversations, voice calls and shared spaces for desktop.
 - Optional notification previews and per-conversation notification preferences.
 - Workspace preferences: resizable navigation/member panels, a focus mode, density presets, and an always-visible, collapsed or selection-based formatting toolbar.
 - Ctrl+K searches contacts, rooms, channels and commands; recent conversations are prioritized during the current unlocked session. Threads, pins and search can use a nonmodal side panel.
-- Friends offer cards or a compact list, online/favorites filters and local favorites. Conversations can be archived and restored without deleting their history or credentials.
+- Friends offer cards or a compact list, online/favorites filters and local favorites. Recent private conversations rise to the top, including sent and received messages. Conversations can be archived and restored without deleting their history or credentials.
 - Quick microphone/output menus provide device selection, levels and an explicit local test. Optional route/RTT details appear in the voice dock.
 - The transfer center combines live per-recipient progress, speed estimates, resume/cancel actions and local transfer history. Completed downloads can be revealed in their folder. Download paths and transfer-center metadata are excluded from portable backups.
 - Searchable settings, section resets, unsaved-change indication, date/clock formats and a configurable first weekday in the local history calendar. The interface remains English.
@@ -66,6 +66,7 @@ Encrypted peer-to-peer conversations, voice calls and shared spaces for desktop.
 - End-to-end encrypted peer communications, with direct connections when available and encrypted relay transport when needed.
 - Optional Tor routing, relay-only connections and a privacy dashboard showing active connection information.
 - A password-protected local account, encrypted history and settings, and an explicit Lock action.
+- Forgot-password recovery with the private recovery key, or an explicitly confirmed local-account reset.
 - Encrypted backups and a private recovery key for manual migration to another device.
 - Explicit contact blocking, invitation controls and identity verification tools.
 - Link previews load on request by default. Automatic previews require explicit opt-in; websites can see your outgoing IP unless routed through Tor.
@@ -77,7 +78,7 @@ Encrypted peer-to-peer conversations, voice calls and shared spaces for desktop.
 Install Git, stable Rust, Node.js **24.22.1** (see `.node-version`) and the [platform prerequisites](docs/DEVELOPMENT.md#platform-prerequisites). Run these commands from a terminal on the platform you want to build for.
 
 ```sh
-git clone https://github.com/Apple-Lollipop/ochat.git
+git clone https://github.com/Apple-Lollipop/OChat-Peer-to-Peer-chat.git ochat
 cd ochat
 npm ci
 ```
@@ -133,3 +134,9 @@ open target/release/bundle/macos/Ochat.app
 This builds for the host architecture (Apple Silicon or Intel) with a local ad-hoc signature, without notarization. The DMG is in `target/release/bundle/dmg/`. See the [development guide](docs/DEVELOPMENT.md) for explicit targets, checks and platform setup.
 
 The output paths above assume `CARGO_TARGET_DIR` is not overridden. Close an already running Ochat instance before launching another build with the same profile.
+
+### Voice messages
+
+Use the microphone button beside the message field to record up to three minutes with your configured microphone and local audio processing. Choose **Stop recording** to listen, then **Send voice message** or **Discard**. The written draft remains unchanged. Changing text channels, locking Ochat, or joining a call discards the recording. End an existing call before recording.
+
+Recordings stay in memory until sent. Sending creates an encrypted file snapshot directly from memory, using the existing P2P file transfer and verification. The recipient clicks **Play** to receive and listen in the conversation, with seeking and volume controls. Received recordings remain encrypted in local storage for later playback; **Save a copy** explicitly exports an unencrypted WAV. The sender must be reachable for the initial transfer, as with other attachments.
